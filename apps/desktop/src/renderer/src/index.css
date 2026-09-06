@@ -1,0 +1,16 @@
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: #050505;
+}
+
+/* YStack f={1} only fills if its container is a flex column of real height. */
+#root {
+  display: flex;
+  flex-direction: column;
+}

@@ -1,0 +1,23 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+# Tamagui's vite/metro plugins and its static compiler resolve @tamagui/* from
+# the app root, which pnpm's strict layout hides (they are nested under the
+# `tamagui` package). Hoisting them keeps the compiler and Vite's dep
+# pre-bundling working; safe here because overrides pin one version of each.
+publicHoistPattern:
+  - "@tamagui/*"
+  - "inline-style-prefixer"
+
+allowBuilds:
+  electron: false
+  esbuild: false
+  unrs-resolver: false
+
+# Tamagui resolves its runtime per react peer version; drift between the apps
+# would give web-vite and native separate @tamagui/web copies, so the config
+# created in @repo/ui would be invisible to the components it renders.
+# 19.2.3 is the version Expo 57 expects, so everything is pinned to it.
+overrides:
+  react: 19.2.3
+  react-dom: 19.2.3

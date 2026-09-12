@@ -188,11 +188,14 @@ Follow-ons:
 
 ### Contract decisions made while building the schema package
 
-- **Direction values are semantic, not flex.** `forward` / `backward` / `down` / `up`, mapped
-  to flex by `DIRECTION_TO_FLEX` in `packages/ui`. The old enum's values were literally
-  `'row'` / `'row-reverse'` — an agent should not be choosing CSS. **[open]** `backward` is
-  still ambiguous (right-to-left, or reverse-chronological?); splitting into
-  `orientation` + `order` would remove the ambiguity if it bites.
+- **The axis is `orientation` + `order`, semantic and unambiguous.**
+  `horizontal | vertical` and `ascending | descending`, mapped to flex by the 2×2
+  `LAYOUT_TO_FLEX` in `packages/ui`. Two things drove this: the original enum's values were
+  literally `'row'` / `'row-reverse'` (an agent should not be choosing CSS), and the first
+  replacement — `forward` / `backward` / `down` / `up` — kept a `backward` member readable
+  as either "right-to-left" or "reverse-chronological". An agent choosing between those two
+  readings had no way to know which was meant. Same four combinations, no ambiguity.
+  `order` sets the direction of the axis; the renderer does not re-sort events.
 - **Timestamps accept ISO date *or* datetime.** Precision of knowledge is itself evidence: a
   document saying "January 2023" must not be promoted to a fabricated `2023-01-01T00:00:00Z`.
   **[open]** An explicit `precision` field is probably needed before `scale: 'time'` can
@@ -203,6 +206,9 @@ Follow-ons:
 - **Per-event ReactNode became render props.** `oppositeContent` was a per-event field, which
   cannot survive serialization. `Timeline` now takes `renderOppositeContent` / `renderEvent`
   instead: the spec carries data, the renderer supplies nodes.
+- **Unknown fields are stripped, not rejected.** Deliberately lenient on read so a newer
+  backend adding a field cannot break an older client. An invented value in a *known* field
+  still fails — that is where the contract does its work.
 - **Enums are const objects, not TS `enum`s.** They do not round-trip to JSON Schema.
   `UnitOfTime.Year` call sites are unchanged.
 - **The emitted JSON Schema is committed** at `packages/report-schema/schema/`, not left in

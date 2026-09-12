@@ -3,7 +3,8 @@ import {
   ComponentSpecSchema,
   ReportSpecSchema,
   SCHEMA_VERSION,
-  TimelineDirection,
+  TimelineOrder,
+  TimelineOrientation,
   TimelineEventSpecSchema,
   TimelineScale,
   UnitOfTime,
@@ -35,11 +36,20 @@ describe("the wire contract actually constrains agent output", () => {
   it("rejects an enum value outside the contract", () => {
     // The exact failure mode an agent produces when it invents a value.
     expect(
-      ComponentSpecSchema.safeParse({ ...validTimeline, direction: "diagonal" }).success,
+      ComponentSpecSchema.safeParse({ ...validTimeline, orientation: "diagonal" }).success,
     ).toBe(false);
     expect(ComponentSpecSchema.safeParse({ ...validTimeline, scale: "logarithmic" }).success).toBe(
       false,
     );
+  });
+
+  it("strips unknown fields rather than rejecting them", () => {
+    // Deliberately lenient on read: a newer backend adding a field must not
+    // break an older client. An invented value in a KNOWN field still fails
+    // (above) — that is where the contract does its work.
+    const result = ComponentSpecSchema.safeParse({ ...validTimeline, direction: "forward" });
+    expect(result.success).toBe(true);
+    expect(result.success && "direction" in result.data).toBe(false);
   });
 
   it("rejects a Date instance as a timestamp", () => {
@@ -75,18 +85,36 @@ describe("the wire contract actually constrains agent output", () => {
     ).toBe(false);
   });
 
-  it("defaults scale and direction so agents need not specify them", () => {
+  it("defaults scale, orientation and order so agents need not specify them", () => {
     const parsed = ComponentSpecSchema.parse(validTimeline);
     expect(parsed.scale).toBe(TimelineScale.Ordinal);
-    expect(parsed.direction).toBe(TimelineDirection.Forward);
+    expect(parsed.orientation).toBe(TimelineOrientation.Horizontal);
+    expect(parsed.order).toBe(TimelineOrder.Ascending);
+  });
+
+  it("has no ambiguous axis value for an agent to guess at", () => {
+    // The old single `direction` enum had a `backward` member readable as either
+    // "right-to-left" or "reverse-chronological". Orientation and order each
+    // mean exactly one thing, so neither reading is expressible as a guess.
+    expect(ComponentSpecSchema.safeParse({ ...validTimeline, orientation: "backward" }).success)
+      .toBe(false);
+    expect(ComponentSpecSchema.safeParse({ ...validTimeline, order: "vertical" }).success)
+      .toBe(false);
+    expect(
+      ComponentSpecSchema.safeParse({
+        ...validTimeline,
+        orientation: "vertical",
+        order: "descending",
+      }).success,
+    ).toBe(true);
   });
 
   it("keeps CSS out of the wire contract", () => {
     // 'row' / 'row-reverse' were the old values; the contract is semantic now.
-    expect(ComponentSpecSchema.safeParse({ ...validTimeline, direction: "row" }).success).toBe(
+    expect(ComponentSpecSchema.safeParse({ ...validTimeline, orientation: "row" }).success).toBe(
       false,
     );
-    expect(TimelineDirection.Forward).toBe("forward");
+    expect(TimelineOrientation.Horizontal).toBe("horizontal");
   });
 
   it("carries per-fact provenance on an event", () => {

@@ -1,5 +1,5 @@
 {
-  "$id": "https://aneural.dev/schema/report/0.1.0",
+  "$id": "https://aneural.dev/schema/report/0.2.0",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "properties": {
@@ -47,14 +47,20 @@
                   "time"
                 ]
               },
-              "direction": {
-                "default": "forward",
+              "orientation": {
+                "default": "horizontal",
                 "type": "string",
                 "enum": [
-                  "forward",
-                  "backward",
-                  "down",
-                  "up"
+                  "horizontal",
+                  "vertical"
+                ]
+              },
+              "order": {
+                "default": "ascending",
+                "type": "string",
+                "enum": [
+                  "ascending",
+                  "descending"
                 ]
               },
               "labelUnit": {

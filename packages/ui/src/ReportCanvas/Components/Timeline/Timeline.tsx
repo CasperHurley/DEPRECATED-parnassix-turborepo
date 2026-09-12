@@ -1,6 +1,6 @@
 import React from "react";
 import {
-    DIRECTION_TO_FLEX,
+    LAYOUT_TO_FLEX,
     TimelineEventProps,
     TimelineProps,
 } from '@/ReportCanvas/Components/Timeline/types'
@@ -8,7 +8,8 @@ import { Section, XStack, YStack, Text } from "tamagui";
 
 export function Timeline({
     events,
-    direction,
+    orientation,
+    order,
     renderEvent,
     renderOppositeContent,
     children,
@@ -17,7 +18,7 @@ export function Timeline({
 
     return (
         <Section>
-            <XStack flexDirection={DIRECTION_TO_FLEX[direction]} jc="space-between">
+            <XStack flexDirection={LAYOUT_TO_FLEX[orientation][order]} jc="space-between">
                 {events.map((event, index) => (
                     <React.Fragment key={event.id}>
                         {renderEvent?.(event, index) ?? (

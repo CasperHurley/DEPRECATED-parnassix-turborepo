@@ -1,6 +1,7 @@
 import {
     SCHEMA_VERSION,
-    TimelineDirection,
+    TimelineOrder,
+    TimelineOrientation,
     TimelineScale,
     type ReportSpec,
 } from "@repo/report-schema";
@@ -24,7 +25,8 @@ export const mockReport: ReportSpec = {
             subtitle: "",
             description: "",
             scale: TimelineScale.Ordinal,
-            direction: TimelineDirection.Forward,
+            orientation: TimelineOrientation.Horizontal,
+            order: TimelineOrder.Ascending,
             labelUnit: "year",
             events: [
                 {

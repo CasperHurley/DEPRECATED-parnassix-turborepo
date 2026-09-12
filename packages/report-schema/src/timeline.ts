@@ -4,21 +4,42 @@ import { LineVariantSchema, TimestampSchema, UnitOfTimeSchema } from "./primitiv
 import { ComponentSpecBaseSchema } from "./component";
 
 /**
- * Which way the timeline runs.
+ * The axis the timeline is laid out along.
  *
- * These are semantic values, NOT flex values. The wire contract must not encode
- * CSS — an agent is choosing a direction, not a layout engine primitive, and the
- * renderer is free to change how it realises "forward". packages/ui maps these
- * to flex directions via DIRECTION_TO_FLEX.
+ * Semantic, NOT a flex value: the wire contract must not encode CSS. An agent
+ * chooses an axis, not a layout-engine primitive, and the renderer is free to
+ * change how it realises one. packages/ui maps orientation + order onto a flex
+ * direction via LAYOUT_TO_FLEX.
  */
-export const TimelineDirection = {
-  Forward: "forward",
-  Backward: "backward",
-  Down: "down",
-  Up: "up",
+export const TimelineOrientation = {
+  Horizontal: "horizontal",
+  Vertical: "vertical",
 } as const;
-export type TimelineDirection = (typeof TimelineDirection)[keyof typeof TimelineDirection];
-export const TimelineDirectionSchema = z.enum(TimelineDirection);
+export type TimelineOrientation =
+  (typeof TimelineOrientation)[keyof typeof TimelineOrientation];
+export const TimelineOrientationSchema = z.enum(TimelineOrientation);
+
+/**
+ * Which way time advances along that axis.
+ *
+ * `ascending` puts the earliest event at the start of the axis (left for
+ * horizontal, top for vertical); `descending` puts the latest there.
+ *
+ * Split out from orientation deliberately. The previous single `direction` enum
+ * had a `backward` member that could be read either as "right-to-left" or as
+ * "reverse-chronological" — two different things, and an agent choosing between
+ * them had no way to know which was meant. Orientation and order are each
+ * unambiguous on their own, at the same four combinations.
+ *
+ * Note this controls the direction of the axis, not the sort: the renderer
+ * lays events out in the order supplied rather than re-sorting them.
+ */
+export const TimelineOrder = {
+  Ascending: "ascending",
+  Descending: "descending",
+} as const;
+export type TimelineOrder = (typeof TimelineOrder)[keyof typeof TimelineOrder];
+export const TimelineOrderSchema = z.enum(TimelineOrder);
 
 /**
  * How event position is computed along the axis.
@@ -59,7 +80,8 @@ export const TimelineSpecSchema = ComponentSpecBaseSchema.extend({
   subtitle: z.string().optional(),
   description: z.string().optional(),
   scale: TimelineScaleSchema.default(TimelineScale.Ordinal),
-  direction: TimelineDirectionSchema.default(TimelineDirection.Forward),
+  orientation: TimelineOrientationSchema.default(TimelineOrientation.Horizontal),
+  order: TimelineOrderSchema.default(TimelineOrder.Ascending),
   /**
    * Granularity used to format each event's label.
    *

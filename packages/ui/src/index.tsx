@@ -6,7 +6,7 @@ export { ComponentErrorBoundary } from "./ReportCanvas/ComponentErrorBoundary";
 export { mockReport } from "./ReportCanvas/fixtures";
 export { Timeline, TimelineEvent } from "./ReportCanvas/Components/Timeline/Timeline";
 export {
-  DIRECTION_TO_FLEX,
+  LAYOUT_TO_FLEX,
   DateMethodMap,
   TimeFormatterMap,
 } from "./ReportCanvas/Components/Timeline/types";
@@ -53,7 +53,8 @@ export {
   CoordOrigin,
   LineVariant,
   SCHEMA_VERSION,
-  TimelineDirection,
+  TimelineOrder,
+  TimelineOrientation,
   TimelineScale,
   UnitOfTime,
 } from "@repo/report-schema";

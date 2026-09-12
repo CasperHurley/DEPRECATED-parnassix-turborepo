@@ -1,13 +1,19 @@
 import React from 'react';
-import type { TimelineEventSpec, TimelineSpec, UnitOfTime } from '@repo/report-schema';
-import { TimelineDirection } from '@repo/report-schema';
+import type {
+    TimelineEventSpec,
+    TimelineOrder,
+    TimelineOrientation,
+    TimelineSpec,
+    UnitOfTime,
+} from '@repo/report-schema';
+import { TimelineOrder as Order, TimelineOrientation as Orientation } from '@repo/report-schema';
 import { TamaguiComponentProps } from '@/types';
 
 /**
  * Renderer-side Timeline types.
  *
- * The wire half (TimelineSpec, TimelineEventSpec, UnitOfTime, TimelineDirection,
- * TimelineScale) lives in @repo/report-schema. What is added here is strictly
+ * The wire half (TimelineSpec, TimelineEventSpec, UnitOfTime, TimelineOrientation,
+ * TimelineOrder, TimelineScale) lives in @repo/report-schema. What is added here is strictly
  * what cannot cross a wire: handlers and ReactNode slots.
  */
 
@@ -37,20 +43,24 @@ export type TimelineEventProps = TimelineEventSpec &
     };
 
 /**
- * Maps the contract's semantic direction onto a flex direction.
+ * Maps the contract's semantic axis onto a flex direction.
  *
- * This mapping is why the wire values are semantic: an agent chooses "the
- * timeline runs forward", not "row-reverse". Swapping layout engines changes
- * this table and nothing else.
+ * This table is why the wire values are semantic: an agent chooses a horizontal
+ * axis running earliest-first, not `row`. Swapping layout engines changes these
+ * four entries and nothing else.
  */
-export const DIRECTION_TO_FLEX: Record<
-    TimelineDirection,
-    'row' | 'row-reverse' | 'column' | 'column-reverse'
+export const LAYOUT_TO_FLEX: Record<
+    TimelineOrientation,
+    Record<TimelineOrder, 'row' | 'row-reverse' | 'column' | 'column-reverse'>
 > = {
-    [TimelineDirection.Forward]: 'row',
-    [TimelineDirection.Backward]: 'row-reverse',
-    [TimelineDirection.Down]: 'column',
-    [TimelineDirection.Up]: 'column-reverse',
+    [Orientation.Horizontal]: {
+        [Order.Ascending]: 'row',
+        [Order.Descending]: 'row-reverse',
+    },
+    [Orientation.Vertical]: {
+        [Order.Ascending]: 'column',
+        [Order.Descending]: 'column-reverse',
+    },
 };
 
 export const TimeFormatterMap: Record<UnitOfTime, Intl.DateTimeFormatOptions> = {

@@ -1,4 +1,4 @@
-import { TimePrecision, resolveTimePrecision } from "./primitives";
+import { TimePrecision, UnitOfTime, resolveTimePrecision } from "./primitives";
 
 /**
  * Presentation of timestamps whose precision is known only approximately.
@@ -11,8 +11,8 @@ import { TimePrecision, resolveTimePrecision } from "./primitives";
  * has to hold identically on web, on native, and in an exported PDF, so it
  * cannot live in any one of them.
  *
- * (By contrast `TimeFormatterMap` and `DateMethodMap` stay in packages/ui —
- * those are axis-labelling and layout arithmetic, not claims about evidence.)
+ * (By contrast `TimeFormatterMap` and `AXIS_TICK_FORMAT` stay in packages/ui —
+ * those are axis-labelling policy, not claims about evidence.)
  */
 export const PRECISION_FORMAT: Record<TimePrecision, Intl.DateTimeFormatOptions> = {
   [TimePrecision.Year]: { year: "numeric" },
@@ -80,4 +80,37 @@ export function formatTimestamp(
   } catch {
     return timestamp;
   }
+}
+
+/** Ranked coarse-to-fine, so two precisions can be compared. */
+const PRECISION_RANK: Record<TimePrecision, number> = {
+  [TimePrecision.Year]: 0,
+  [TimePrecision.Month]: 1,
+  [TimePrecision.Day]: 2,
+  [TimePrecision.Hour]: 3,
+  [TimePrecision.Minute]: 4,
+  [TimePrecision.Second]: 5,
+};
+
+/**
+ * The precision an event's label should be rendered at.
+ *
+ * `labelUnit` is a presentation preference, and it may only ever COARSEN. A
+ * spec asking for minute labels on a month-precision event is asking the
+ * renderer to state something the source does not — the same fabrication
+ * `PRECISION_FORMAT` exists to prevent, arriving through a different field.
+ * Since every field exposed to an agent is a field an agent can get wrong, the
+ * clamp lives here rather than in a review step.
+ *
+ * `week` has no `TimePrecision` counterpart and is a no-op.
+ */
+export function labelPrecision(
+  timestamp: string,
+  precision?: TimePrecision,
+  labelUnit?: UnitOfTime,
+): TimePrecision {
+  const resolved = resolveTimePrecision(timestamp, precision);
+  if (!labelUnit || labelUnit === UnitOfTime.Week) return resolved;
+  const wanted = labelUnit as TimePrecision;
+  return PRECISION_RANK[wanted] < PRECISION_RANK[resolved] ? wanted : resolved;
 }

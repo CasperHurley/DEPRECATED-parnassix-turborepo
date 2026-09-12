@@ -1,5 +1,5 @@
 {
-  "$id": "https://aneural.dev/schema/report/0.3.0",
+  "$id": "https://aneural.dev/schema/report/0.4.0",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "properties": {
@@ -92,20 +92,29 @@
                     "precision": {
                       "$ref": "#/$defs/__schema4"
                     },
-                    "title": {
-                      "$ref": "#/$defs/__schema5"
-                    },
-                    "subtitle": {
+                    "until": {
                       "$ref": "#/$defs/__schema6"
                     },
-                    "description": {
+                    "untilPrecision": {
                       "$ref": "#/$defs/__schema7"
                     },
-                    "lineVariant": {
+                    "title": {
                       "$ref": "#/$defs/__schema8"
                     },
-                    "source": {
+                    "subtitle": {
                       "$ref": "#/$defs/__schema9"
+                    },
+                    "description": {
+                      "$ref": "#/$defs/__schema10"
+                    },
+                    "lineVariant": {
+                      "$ref": "#/$defs/__schema11"
+                    },
+                    "source": {
+                      "$ref": "#/$defs/__schema12"
+                    },
+                    "spans": {
+                      "$ref": "#/$defs/__schema13"
                     }
                   },
                   "required": [
@@ -242,6 +251,9 @@
       ]
     },
     "__schema4": {
+      "$ref": "#/$defs/__schema5"
+    },
+    "__schema5": {
       "type": "string",
       "enum": [
         "year",
@@ -252,19 +264,55 @@
         "second"
       ]
     },
-    "__schema5": {
-      "type": "string"
-    },
     "__schema6": {
-      "type": "string"
+      "$ref": "#/$defs/__schema3"
     },
     "__schema7": {
-      "type": "string"
+      "$ref": "#/$defs/__schema5"
     },
     "__schema8": {
-      "$ref": "#/$defs/__schema1"
+      "type": "string"
     },
     "__schema9": {
+      "type": "string"
+    },
+    "__schema10": {
+      "type": "string"
+    },
+    "__schema11": {
+      "$ref": "#/$defs/__schema1"
+    },
+    "__schema12": {
+      "$ref": "#/$defs/__schema0"
+    },
+    "__schema13": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "timestamp": {
+            "$ref": "#/$defs/__schema3"
+          },
+          "precision": {
+            "$ref": "#/$defs/__schema4"
+          },
+          "until": {
+            "$ref": "#/$defs/__schema6"
+          },
+          "untilPrecision": {
+            "$ref": "#/$defs/__schema7"
+          },
+          "source": {
+            "$ref": "#/$defs/__schema14"
+          }
+        },
+        "required": [
+          "timestamp"
+        ]
+      }
+    },
+    "__schema14": {
       "$ref": "#/$defs/__schema0"
     }
   }

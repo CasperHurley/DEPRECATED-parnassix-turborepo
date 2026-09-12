@@ -4,7 +4,6 @@ import type {
     TimelineOrder,
     TimelineOrientation,
     TimelineSpec,
-    UnitOfTime,
 } from '@repo/report-schema';
 import { TimelineOrder as Order, TimelineOrientation as Orientation } from '@repo/report-schema';
 import { TamaguiComponentProps } from '../../../types';
@@ -63,30 +62,15 @@ export const LAYOUT_TO_FLEX: Record<
     },
 };
 
-export const TimeFormatterMap: Record<UnitOfTime, Intl.DateTimeFormatOptions> = {
-  second: { second: 'numeric' },
-  minute: { minute: 'numeric', second: 'numeric' },
-  hour:   { hour: 'numeric', minute: '2-digit' },
-  day:    { day: 'numeric' },
-  week:   { weekday: 'long' },
-  month:  { month: 'short' }, // "Jan", "Feb", etc.
-  year:   { year: 'numeric' }
-};
-
-// Usage Example:
-// const options = TimeFormatterMap[UnitOfTime.Month];
-// new Intl.DateTimeFormat('en-US', options).format(new Date()); -> "Oct"
-
-export interface DateMethods {
-  getter: keyof Date;
-  setter: keyof Date;
-}
-
-export const DateMethodMap: Record<Exclude<UnitOfTime, 'week'>, DateMethods> = {
-  second: { getter: 'getSeconds', setter: 'setSeconds' },
-  minute: { getter: 'getMinutes', setter: 'setMinutes' },
-  hour:   { getter: 'getHours',    setter: 'setHours' },
-  day:    { getter: 'getDate',    setter: 'setDate' },    // Note: 'getDate' is day-of-month
-  month:  { getter: 'getMonth',   setter: 'setMonth' },
-  year:   { getter: 'getFullYear',setter: 'setFullYear' },
-};
+/*
+ * `TimeFormatterMap` moved to `axis.ts`, and `DateMethodMap` was removed.
+ *
+ * The formatter map is axis-labelling policy and belongs with the rest of it,
+ * in a module that imports no React so it can be unit-tested. `DateMethodMap`
+ * had no call sites and was a trap: its getters and setters (`getHours`,
+ * `getDate`, …) read the VIEWER's zone, so building tick boundaries out of them
+ * would have moved events across day boundaries — the failure `formatTimestamp`
+ * exists to prevent. It also could not express `week`, which the tick ladder
+ * needs. `floorToUnit` and `addUnits` in `@repo/report-schema` do that job with
+ * an explicit offset instead.
+ */

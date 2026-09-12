@@ -4,7 +4,7 @@ import {
   ComponentSpecSchema,
   z,
   type ComponentKind,
-  type ComponentSpec,
+  type ComponentSpecInput,
 } from "@repo/report-schema";
 import { Timeline } from "./Components/Timeline/Timeline";
 import { ComponentErrorBoundary } from "./ComponentErrorBoundary";
@@ -13,7 +13,14 @@ import { ReportCanvasProps } from "../types";
 
 export function ReportCanvas({ report }: ReportCanvasProps) {
   return (
-    <Section>
+    /*
+     * The canvas fills the box it is given rather than shrinking to its
+     * content. An ancestor with `alignItems: center` would otherwise collapse
+     * it to the width of its widest child, and a component that lays out
+     * proportionally — the time-scaled Timeline — would have almost no axis to
+     * be proportional across.
+     */
+    <Section alignSelf="stretch" width="100%" px="$4">
       <H1>Report Canvas</H1>
       {report.components.map((component, index) => (
         <ComponentErrorBoundary
@@ -36,7 +43,7 @@ export function ReportCanvas({ report }: ReportCanvasProps) {
  * CLAUDE.md; Python validates its agents' output and NestJS validates the
  * public boundary.
  */
-function ReportComponent({ spec }: { spec: ComponentSpec }) {
+function ReportComponent({ spec }: { spec: ComponentSpecInput }) {
   const parsed = ComponentSpecSchema.safeParse(spec);
 
   if (!parsed.success) {

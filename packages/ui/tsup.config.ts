@@ -7,10 +7,20 @@ export default defineConfig((options: Options) => ({
   banner: {
     js: "'use client'",
   },
-  // tsup deletes dist/ before each rebuild; in watch mode that leaves a window
-  // where a running Vite dev server cannot resolve @repo/ui. Only clean on
-  // one-shot builds.
-  clean: !options.watch,
+  // NEVER clean.
+  //
+  // tsup deletes dist/ before recreating it, which leaves a window — tens of
+  // milliseconds, but real — in which this package HAS a package.json pointing
+  // at files that do not exist. Any consumer's watcher resolving in that window
+  // fails hard: Metro reports `Unable to resolve "@repo/ui"` and the running
+  // native app is then left holding a broken module graph, which surfaces later
+  // as `undefined is not a function` rather than as a resolve error. In a
+  // monorepo someone is nearly always running a dev server, so the one-shot
+  // build is exactly as dangerous as the watch build.
+  //
+  // Nothing is lost by skipping it: there is a single entry, so every emitted
+  // file is overwritten in place and no orphans accumulate.
+  clean: false,
   format: ["cjs", "esm"],
   // @repo/report-schema and zod stay external: schema objects created by two
   // different copies of zod are not interchangeable, and consumers resolve the

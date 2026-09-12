@@ -2,10 +2,14 @@ import { z } from "zod";
 import { SourceRefSchema } from "./source";
 import {
   LineVariantSchema,
-  TimePrecisionSchema,
-  TimestampSchema,
+  TimeSpanSchema,
+  checkTimeSpan,
+  spanInterval,
+  timeSpanFields,
   UnitOfTimeSchema,
-  timestampSupportsPrecision,
+  type TimeInterval,
+  type TimePrecision,
+  type TimeSpan,
 } from "./primitives";
 import { ComponentSpecBaseSchema } from "./component";
 
@@ -70,23 +74,33 @@ export const TimelineEventSpecSchema = z.object({
    * that one". Array index is not good enough for any of those.
    */
   id: z.string().min(1),
-  timestamp: TimestampSchema,
   /**
-   * How much of `timestamp` the source actually establishes. Omitted means
-   * "as precise as the string looks" — see resolveTimePrecision.
+   * The event's primary period: `timestamp` with optional `precision`, and an
+   * optional `until` when the source recorded a real end rather than a vague
+   * instant. Same four fields as a `TimeSpan`, checked by the same rules.
    */
-  precision: TimePrecisionSchema.optional(),
+  ...timeSpanFields,
   title: z.string(),
   subtitle: z.string().optional(),
   description: z.string().optional(),
   lineVariant: LineVariantSchema.optional(),
   /** Where this specific event came from. Citations are per-fact. */
   source: SourceRefSchema.optional(),
-}).refine((event) => timestampSupportsPrecision(event.timestamp, event.precision ?? "day"), {
-  message: "precision is finer than the timestamp supports (no time-of-day component)",
-  path: ["precision"],
-});
+  /**
+   * Further periods of the SAME fact, beyond the one `timestamp` denotes.
+   *
+   * Additive on purpose. `timestamp` stays required and primary, so an older
+   * renderer strips this field and still places the event at its primary time —
+   * degraded, never wrong. Making the event a bare array of periods instead
+   * would have broken every existing spec AND removed the invariant that an
+   * event has one canonical position, which `order` and "regenerate that one"
+   * both lean on.
+   */
+  spans: z.array(TimeSpanSchema).default([]),
+}).superRefine(checkTimeSpan);
 export type TimelineEventSpec = z.infer<typeof TimelineEventSpecSchema>;
+/** What an agent writes: defaulted fields are still optional here. */
+export type TimelineEventSpecInput = z.input<typeof TimelineEventSpecSchema>;
 
 export const TimelineSpecSchema = ComponentSpecBaseSchema.extend({
   kind: z.literal("timeline"),
@@ -111,3 +125,26 @@ export const TimelineSpecSchema = ComponentSpecBaseSchema.extend({
   events: z.array(TimelineEventSpecSchema),
 });
 export type TimelineSpec = z.infer<typeof TimelineSpecSchema>;
+export type TimelineSpecInput = z.input<typeof TimelineSpecSchema>;
+
+/**
+ * Every period an event covers, primary first, in the order the spec gave them.
+ *
+ * Unreadable periods are dropped rather than represented, for the same reason
+ * `timestampInterval` returns null: a period that cannot be read cannot be
+ * positioned, and positioning it anyway would assert a time no source stated.
+ * An event whose PRIMARY timestamp is unreadable yields an empty array and is
+ * listed as undated by the renderer.
+ */
+export function eventIntervals(event: {
+  timestamp: string;
+  precision?: TimePrecision;
+  spans?: readonly TimeSpan[];
+}): TimeInterval[] {
+  const primary = spanInterval(event);
+  if (!primary) return [];
+  const rest = (event.spans ?? [])
+    .map((span) => spanInterval(span))
+    .filter((iv): iv is TimeInterval => iv !== null);
+  return [primary, ...rest];
+}

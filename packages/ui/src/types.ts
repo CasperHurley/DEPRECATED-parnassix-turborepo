@@ -1,6 +1,6 @@
 import { GestureResponderEvent, NativeMouseEvent } from 'react-native';
 import { FocusEvent, MouseEvent } from 'react';
-import type { ReportSpec } from '@repo/report-schema';
+import type { ReportSpecInput } from '@repo/report-schema';
 
 /**
  * Renderer-side types.
@@ -49,5 +49,5 @@ export type ReportCanvasProps = {
      * arrives from the API — the canvas revalidates it rather than trusting the
      * type, since a compile-time type proves nothing about a network payload.
      */
-    report: ReportSpec;
+    report: ReportSpecInput;
 } & TamaguiComponentProps;

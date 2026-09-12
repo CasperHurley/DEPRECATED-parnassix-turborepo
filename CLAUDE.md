@@ -101,6 +101,18 @@ footnote markers plus a reference table on export. Same data, two presentations.
 
 ### Render context in the type system — [built: type + context; nothing lays out from it yet]
 
+Both scales deliberately sidestep this, and it turned out measurement was never the answer.
+They position everything as a *percentage* of the axis, and the renderer NAMES the axis's
+minimum length in pixels rather than inheriting the viewport's. The lane-collision threshold
+is then derived — `oneCardSlot / axisLength` — which makes "cards never overprint" a
+guarantee by construction rather than a constant that happened to hold at desktop width.
+A wider viewport only ever adds slack; a narrower one scrolls.
+
+That replaced a constant `minSeparation` of ~12%, which was right on a desktop and badly
+wrong on a phone: a 390px axis made the threshold 47px while a card is 168px wide, so every
+card in a cluster overprinted its neighbours. Pinned now by a test asserting that any two
+cards sharing a lane are at least one card apart.
+
 No component owns its own dimensions. Every component receives a render context —
 approximately `{ medium: 'screen' | 'print' | 'slide', width, height }` — and lays out from
 the box it's given. The same report must render to a phone, a slide, letter paper, and a
@@ -165,13 +177,18 @@ Components may own state, including calling next/prev API routes for paginated o
 data. Interactivity is decided per component: the user should be able to reach all the data
 they need on the frontend they're using, and design may differ across web/mobile/desktop.
 
-### Timeline — [built: contract only; no temporal-axis rendering]
+### Timeline — [built]
 
 One component with a `scale` prop, **not** two components. The difference between the two
 useful layouts is only the position function:
 
 - `ordinal` — evenly spaced, position = index. Good for milestones and narrow mobile
-  viewports where proportional spacing collapses into overlap.
+  viewports where proportional spacing collapses into overlap. It needs none of the time
+  scale's machinery: no domain, no ticks, no lanes, no trunks, because events given an equal
+  share of the axis cannot collide. It has no undated case either — an unreadable timestamp
+  cannot break an ordinal position, so the event still renders in sequence. Precision is shown
+  by the WEIGHT of its marker rather than by the width of a band, since an even axis has no
+  width to spend on it.
 - `time` — position proportional to timestamp. **This is the important one for evidentiary
   work: the gaps are the evidence.** "Nothing for eight months, then five things in
   seventy-two hours" is an argument, and ordinal spacing destroys it.
@@ -182,9 +199,29 @@ Follow-ons:
   Resolved by exposing **only** `labelUnit`: tick granularity is derived by the renderer from
   the data range, so it is not an agent-facing field at all. **Every field exposed to an agent
   is a field an agent can get wrong** — keep the agent-facing surface minimal.
-- Dense clusters need a defined answer (stacking, expandable clustering, or a broken/zoomable
-  axis). Real extracted data will put nine events on one afternoon inside a five-year span.
-  This is the interaction model, not a detail. **[open]**
+- **A card is tied to its period, not to a point.** An event known only to its month or year
+  occupies a span, and a single leader line dropped from the middle of that span says the
+  opposite — it points at an instant the source never identified. Ranged events therefore get
+  a bracket whose arms land on the real start and end of the period; only point events get
+  the single line. Markers also fade with the coarseness of their precision, because a
+  full-strength band across a whole year reads as "this lasted a year" rather than "this is
+  the window it falls in".
+- **Both scales scroll rather than shrink.** Each wraps its axis in a horizontal
+  `ScrollView` whose content has a minimum length, so a narrow viewport pans along a timeline
+  that keeps its proportions instead of crushing every card toward zero width. The page itself
+  never scrolls sideways — only the component does.
+- **The card box is a fixed size, and clips.** Lane positions are pure arithmetic with
+  nothing measured, so the renderer has to know a card's extent before it draws one — a card
+  that grew a line taller than its lane would silently overprint the lane below rather than
+  push it down.
+- Dense clusters are answered by **deterministic lane stacking**: events whose footprints
+  collide are pushed to parallel lanes and reached by a leader line back to the axis.
+  Expandable clustering and a zoomable axis were both rejected for the same reason
+  hover-only citation was — an interaction that is the *only* route to a fact does not
+  survive the export path. Lane assignment is greedy-lowest over a sorted copy, so it is
+  reproducible byte-for-byte and a PDF matches the screen. Lane count is bounded
+  (`maxLanes`, default 6): a year-precision event occupies a year of axis, and unbounded
+  lanes make the component arbitrarily tall.
 
 ### Contract decisions made while building the schema package
 
@@ -209,20 +246,38 @@ Follow-ons:
   - **Caveat: JSON Schema cannot express this cross-field rule**, so the emitted artifact does
     not carry it and `datamodel-code-generator` will not reproduce it. The Python side needs
     its own validator or the pair passes Pydantic and fails here. Pinned by a test.
+- **Positioning honours the source zone too, not just display.** `timestampInterval` reads a
+  timestamp's own offset and never calls a local-time `Date` accessor, because `getDate()` in
+  a negative-offset viewer can return the previous day and move an event across a day
+  boundary — the same failure `formatTimestamp` was written to prevent, arriving through the
+  layout layer. It returns **`null`, not `NaN`**, for an unreadable timestamp: `Math.min(NaN, x)`
+  is `NaN`, so one bad value would poison the domain and blank the whole axis. The renderer
+  lists such events as undated rather than placing them at position zero, which would assert
+  they happened at the start of the report.
+- **`labelUnit` may only coarsen.** `labelPrecision` clamps it against the event's resolved
+  precision: asking for minute labels on a month-precision event is the same fabrication
+  `PRECISION_FORMAT` exists to prevent, arriving through a different field.
 - **`formatTimestamp` renders in the zone the timestamp was written in, never the viewer's**,
   and lives in `@repo/report-schema` rather than a renderer. Both follow from the same
   requirement: two people in different timezones looking at the same evidence must see the
   same time, and the guarantee has to hold identically on web, native, and in an exported
   PDF. A local-zone shift can move an event across a day boundary or reorder it against a
   neighbour — material when the timeline *is* the argument. (`TimeFormatterMap` and
-  `DateMethodMap` stay in `packages/ui`: those are axis labelling and layout arithmetic, not
-  claims about evidence.)
+  `AXIS_TICK_FORMAT` stay in `packages/ui`: those are axis labelling policy, not claims about
+  evidence. The calendar *mechanism* they rely on — `timestampInterval`, `floorToUnit`,
+  `addUnits` — lives in the contract, because what a precision denotes is a claim about
+  evidence even though which unit to tick at is not.)
 - **`SourceRef.bbox` is an array and carries `pageSize`.** A quoted fact spans lines, so one
   ref needs many boxes; and a BOTTOMLEFT box cannot be flipped into the renderer's TOPLEFT
   space without the page height.
 - **Per-event ReactNode became render props.** `oppositeContent` was a per-event field, which
   cannot survive serialization. `Timeline` now takes `renderOppositeContent` / `renderEvent`
   instead: the spec carries data, the renderer supplies nodes.
+- **Input and output types are both named.** `ReportSpec` is what the renderer holds AFTER
+  validation, with every default filled in; `ReportSpecInput` is what an agent emits and the
+  wire carries. `ReportCanvas` takes the *input* type, because anything reading unvalidated
+  data should say so in its types rather than claim a guarantee it has not checked — the
+  fixtures are authored input for the same reason.
 - **Unknown fields are stripped, not rejected.** Deliberately lenient on read so a newer
   backend adding a field cannot break an older client. An invented value in a *known* field
   still fails — that is where the contract does its work.
@@ -231,6 +286,124 @@ Follow-ons:
 - **The emitted JSON Schema is committed** at `packages/report-schema/schema/`, not left in
   gitignored `dist/`, because a separate Python repo cannot codegen against an unpushed file.
   `pnpm --filter @repo/report-schema check:schema` fails if it drifts from the Zod source.
+
+### Multiple periods — [built] — and grouped events — [decided, not built]
+
+Two needs that look alike and need different answers.
+
+**(a) One fact, several periods.** "Payments were made in March, July and November" is a
+single fact with three spans. `TimelineEventSpec` carries one `timestamp` + `precision`,
+which denotes exactly one interval.
+
+**(b) Several facts, one card.** Three calls on one afternoon that the report wants to
+present as one entry rather than three stacked cards — while each call keeps its own
+`SourceRef`.
+
+#### (a) `spans` on the event — **[built]**
+
+```ts
+// primitives.ts
+export const TimeSpanSchema = z.object({
+  timestamp: TimestampSchema,
+  precision: TimePrecisionSchema.optional(),
+  /** An explicit end. Absent means the span is exactly the precision's own width. */
+  until: TimestampSchema.optional(),
+  untilPrecision: TimePrecisionSchema.optional(),
+  /** Periods of one fact can come from different documents. */
+  source: SourceRefSchema.optional(),
+});
+
+// timeline.ts — additive only
+TimelineEventSpecSchema = z.object({
+  /* …unchanged… */
+  timestamp: TimestampSchema,                    // still required, still primary
+  precision: TimePrecisionSchema.optional(),
+  spans: z.array(TimeSpanSchema).default([]),    // NEW: further periods of the same fact
+});
+```
+
+- **`timestamp` stays required and primary.** Replacing it with a `spans` array would break
+  every existing spec and, worse, remove the invariant that every event has one canonical
+  position — which `order`, lane packing and "regenerate that one" all lean on. Additive
+  means an older client strips the unknown field and still renders the event at its primary
+  time: degraded, never wrong. That is the existing unknown-fields rule doing its job.
+- **`until` is separate from `precision`.** A span with a real end ("the injunction ran 3
+  March to 19 May") is a different claim from an imprecise instant ("some time in March").
+  Collapsing them would let a renderer draw a month-precision point as a two-month duration —
+  a fabricated duration, the same class of error `precision` exists to prevent.
+  `timestampInterval` already yields the precision's own width; `until` overrides only the end.
+- **Cross-field rules JSON Schema cannot carry**, exactly as with `precision` today: `until`
+  must not precede `timestamp`; `untilPrecision` requires `until` and must be supportable by
+  that string. Zod `.refine` plus a test each, and the Python side needs its own validator or
+  the pair passes Pydantic and fails here.
+
+`until` sits on the event itself as well as inside `spans`, so the primary period can be a
+duration too. Both are checked by one function, `timeSpanIssues` — two copies of those rules
+would drift, and the half that drifted would be the half no test covered.
+
+Renderer: `eventIntervals(event)` returns the primary interval plus each span.
+`PositionedEvent` gains a `spans` array of fractions, and its own `startFraction` /
+`endFraction` are now the **hull** across all of them, so an event with periods in March and
+November occupies that whole stretch for collision purposes and is never drawn as two cards.
+One band is drawn per period. The span bracket generalised exactly as designed — arms-plus-rail
+rather than a box, so N arms meet one rail and feed one leader.
+
+#### Trunks: one branch point per cluster — **[built]**
+
+Drawing a line from the axis to every card produced a bundle of near-identical verticals in
+any dense cluster — noise rather than structure. Events now share a trunk when they fall on
+the same calendar day in the axis's zone, or when they sit closer than the lane-collision
+threshold. The second rule is self-scaling: zoom in until a cluster spreads out and it stops
+applying, so events get their own trunks again exactly when there is room to tell them apart.
+
+Positional honesty survives because the **arms** carry it: one rises to the axis at every
+period the group covers, landing where the evidence does, whatever the trunk does. The trunk
+is only a routing device.
+
+An event with a visible extent, or with several periods, is always its own group — folding it
+into a neighbour's trunk would imply the two are one fact.
+
+**Lane packing runs on groups, not events**, because a card is drawn at its group's branch
+point; packing the events would measure collisions somewhere the cards are not. Members take
+the lowest free lanes in chronological order, so a cluster reads top-to-bottom the way it
+happened.
+
+#### (b) `groupId` across events — [decided, not built]
+
+Note this is now only about *presentation* — automatic trunk grouping above already gives a
+cluster one branch point. `groupId` would additionally merge several facts into a single
+**card**.
+
+```ts
+/** Events sharing a groupId MAY be presented as one card. A hint, not a command. */
+groupId: z.string().min(1).optional(),
+```
+
+- **A hint the renderer may decline.** Three calls may be better as three cards on a poster
+  and one card on a phone. Because it is a hint, no agent output becomes invalid when the
+  renderer decides otherwise.
+- **Flat array, not nesting.** `event.children` would make every consumer walk a tree, push
+  provenance a level down, and stop `id` being a flat reconciliation key — which the planned
+  SSE `replace-by-id` mutation protocol depends on.
+- **Each member keeps its own mark and its own `SourceRef`.** The card is a presentation
+  container; the axis still shows N marks and the card lists N citations. Grouping that
+  erased per-fact provenance would defeat the thing this repo exists for.
+
+#### Versioning and scope
+
+`spans`, `until` and `untilPrecision` are additive and optional, so `SCHEMA_VERSION` went
+`0.3.0` → `0.4.0`, `schema/report-schema.json` was regenerated and committed, and Python
+regenerates its Pydantic models from it. An older renderer reading a newer spec strips the new
+fields and still renders every event once, at its primary time.
+
+The cross-field rules in `timeSpanIssues` are `superRefine`s, so — as with `precision` — they
+do **not** appear in the emitted artifact and `datamodel-code-generator` will not reproduce
+them. The Python side needs its own validator or a spec passes Pydantic and fails here.
+
+**Deliberately excluded: recurrence rules** ("every Tuesday"). A recurrence rule is a
+generator, and this contract carries facts rather than generators — a renderer that has to
+expand one is a renderer that can disagree with the backend about what the evidence says. The
+Python side expands any such rule into `spans` before it crosses the wire.
 
 ## Current state of the code
 
@@ -246,10 +419,19 @@ The wire contract exists and is enforced; the rendering is still scaffolding.
 - `packages/ui/src/ReportCanvas/ReportCanvas.tsx` — takes `report`, `safeParse`s each
   component, switches on `kind`, wraps each in `ComponentErrorBoundary`. Validation failure
   and render throw are two separate mechanisms; both produce a `ComponentErrorCard`.
-- `packages/ui/src/ReportCanvas/Components/Timeline/` — `types.ts` holds the props layer plus
-  the renderer lookups (`DIRECTION_TO_FLEX`, `TimeFormatterMap`, `DateMethodMap`);
-  `Timeline.tsx` is prop-driven, keyed by `event.id`. **No axis, no line, no temporal
-  positioning yet** — `scale` and `labelUnit` are carried but unused by the renderer.
+- `packages/ui/src/ReportCanvas/Components/Timeline/` — `types.ts` holds the props layer and
+  `LAYOUT_TO_FLEX` (the ordinal path's flex lookup); `axis.ts` is the pure layout module for
+  `scale: 'time'` (domain, tick ladder, lane packing, `AXIS_PLACEMENT`, `TimeFormatterMap`,
+  `AXIS_TICK_FORMAT`) with no React or Tamagui import, so it is unit-testable without a DOM;
+  `Timeline.tsx` branches on `scale` into `OrdinalTimeline.tsx` or `TimeScaleTimeline.tsx`.
+  `axis.ts` also owns `groupTimelineEvents` (shared branch points) and `packGroupLanes`
+  (collision packing, which runs on groups because cards are drawn at a group's trunk).
+  `card.tsx` holds everything the two scales share — the card box and its body, the header,
+  the empty state, `formatEventPeriods`. The scales differ in where a card is PUT and in
+  nothing else, so writing that twice would let the same report read differently depending on
+  a `scale` value that is supposed to control position alone.
+  `DateMethodMap` was deleted — it had no call sites, used local-time accessors, and could
+  not express `week`.
 - `packages/ui/src/ReportCanvas/fixtures.ts` — `mockReport`, the data formerly inlined in
   Timeline's `useState`. The three apps pass it explicitly.
 - `packages/ui/src/render-context.tsx` — `RenderContextProvider` / `useRenderContext` /
@@ -267,10 +449,9 @@ Known gaps:
 
 ## Immediate next work
 
-1. Timeline's temporal axis (`scale: 'time'`). The `precision` question it was blocked on is
-   now answered — positioning must honour `resolveTimePrecision`, so a month-precision event
-   occupies its month rather than a point.
-2. A second component (Table) — the first real test of whether adding a `kind` is mechanical.
-3. The chat/SSE session layer and the canvas mutation protocol
+1. A second component (Table) — the first real test of whether adding a `kind` is mechanical.
+2. The chat/SSE session layer and the canvas mutation protocol
    (append / replace-by-id / remove), which the current snapshot-shaped `ReportSpec`
    deliberately does not yet support.
+3. `groupId`, if grouping several facts onto one card turns out to be wanted. Automatic trunk
+   grouping already covers the visual half of that need.

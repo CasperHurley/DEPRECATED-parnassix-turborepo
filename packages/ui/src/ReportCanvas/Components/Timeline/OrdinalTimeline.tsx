@@ -223,9 +223,9 @@ function OrdinalStep({
 }
 
 /**
- * Kept for the `children` escape hatch and for consumers that were rendering a
- * single event directly. The default layout no longer uses it — a card's
- * content lives in `EventCardBody`, shared with the time scale.
+ * A standalone event card, for the `children` escape hatch and for consumers
+ * rendering one event directly. The default layout uses `EventCardBody`
+ * instead, which it shares with the time scale.
  */
 export const TimelineEvent: React.FC<{
   title: string;

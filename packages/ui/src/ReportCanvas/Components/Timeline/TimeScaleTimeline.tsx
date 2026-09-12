@@ -197,13 +197,13 @@ export function TimeScaleTimeline({
   const axisLength = Math.max(MIN_CARDS_ACROSS, events.length / TARGET_LANES) * cardSlot;
 
   /**
-   * Derived from that length, never assumed.
+   * Derived from that length, never a constant.
    *
    * Lane packing keeps two cards in the same lane at least this far apart, so
    * setting it to exactly one card's slot is what makes "cards never overprint"
-   * a guarantee rather than a hope. It was previously a constant fraction, which
-   * held at desktop width and failed badly on a phone — a 390px axis made the
-   * threshold 47px while a card is 168px wide, and everything collided.
+   * a guarantee rather than a hope. A fixed fraction cannot: 12% is a card's
+   * width on a 1400px axis and 47px on a phone's 390px one, where a card is
+   * still 168px.
    */
   const minSeparation = cardSlot / axisLength;
 
@@ -413,9 +413,9 @@ export function TimeScaleTimeline({
 /**
  * Leads the eye from a group of cards back to the axis they came from.
  *
- * One branch point per group, not one line per card. A dense cluster used to
- * produce a bundle of near-identical verticals that read as noise; now the
- * cluster gets a single trunk, and the cards hang off it.
+ * One branch point per group, not one line per card: a line from the axis to
+ * every card in a dense cluster is a bundle of near-identical verticals that
+ * reads as noise, so the cluster gets a single trunk and the cards hang off it.
  *
  * Three parts, each saying something different:
  *

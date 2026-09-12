@@ -1,14 +1,9 @@
 /*
- * Host-page styling only.
+ * Host-page styling only — no colours, fonts or type scale.
  *
- * Deliberately sets no colours, fonts or type scale. Everything visual belongs
- * to Tamagui and the @repo/ui component layer; the Vite starter template this
- * app was generated from styled `:root`, `h1`, `h2` and `code` from outside
- * that layer, which meant the same ReportSpec rendered differently here than on
- * desktop or native. A renderer whose output depends on which app embedded it
- * is not a renderer this project can use.
- *
- * Mirrors apps/desktop/src/renderer/src/index.css on purpose.
+ * Styling `:root`, `h1` or `code` from here reaches inside @repo/ui from
+ * outside it, and the same ReportSpec then renders differently on web than on
+ * desktop or native. Mirrors apps/desktop/src/renderer/src/index.css.
  */
 
 :root {

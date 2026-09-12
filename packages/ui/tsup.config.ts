@@ -7,19 +7,11 @@ export default defineConfig((options: Options) => ({
   banner: {
     js: "'use client'",
   },
-  // NEVER clean.
-  //
-  // tsup deletes dist/ before recreating it, which leaves a window — tens of
-  // milliseconds, but real — in which this package HAS a package.json pointing
-  // at files that do not exist. Any consumer's watcher resolving in that window
-  // fails hard: Metro reports `Unable to resolve "@repo/ui"` and the running
-  // native app is then left holding a broken module graph, which surfaces later
-  // as `undefined is not a function` rather than as a resolve error. In a
-  // monorepo someone is nearly always running a dev server, so the one-shot
-  // build is exactly as dangerous as the watch build.
-  //
-  // Nothing is lost by skipping it: there is a single entry, so every emitted
-  // file is overwritten in place and no orphans accumulate.
+  // Never clean: deleting dist/ leaves a window in which this package's
+  // package.json points at files that do not exist, and a consumer's watcher
+  // resolving there fails hard — Metro cannot resolve @repo/ui, and the native
+  // app surfaces that later as `undefined is not a function`. A single entry
+  // means every file is overwritten in place, so cleaning buys nothing.
   clean: false,
   format: ["cjs", "esm"],
   // @repo/report-schema and zod stay external: schema objects created by two

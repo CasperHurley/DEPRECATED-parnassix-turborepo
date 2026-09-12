@@ -11,6 +11,12 @@ export default defineConfig({
     plugins: [externalizeDepsPlugin()],
   },
   renderer: {
+    // Pinned so it never competes with web-vite for 5173. See that app's
+    // vite.config.ts.
+    server: {
+      port: 5174,
+      strictPort: true,
+    },
     plugins: [
       react(),
       tamaguiPlugin({

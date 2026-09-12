@@ -1,4 +1,4 @@
-import { YStack, XStack, ReportCanvas } from "@repo/ui";
+import { YStack, XStack, ReportCanvas, mockReport } from "@repo/ui";
 
 export default function Native() {
   return (
@@ -10,7 +10,7 @@ export default function Native() {
       bg="$background"
     >
       <XStack>
-        <ReportCanvas />
+        <ReportCanvas report={mockReport} />
       </XStack>
     </YStack>
   );

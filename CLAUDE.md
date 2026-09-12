@@ -43,7 +43,7 @@ layer consumed by web, desktop, and native. Add a component there, export it fro
 Status: **[decided]** = agreed, may not be built yet. **[built]** = exists in code.
 **[open]** = still undecided.
 
-### Two type layers, kept separate — [decided, not built]
+### Two type layers, kept separate — [built]
 
 Component types currently conflate two incompatible things. They must split:
 
@@ -59,7 +59,7 @@ type TimelineProps = TimelineSpec & TamaguiComponentProps & { /* render-only ext
 `TamaguiComponentProps` (`onPress`, `hitSlop`, …) **cannot cross a wire** and must never
 appear in a wire type.
 
-### Schema lives in its own package — [decided, not built]
+### Schema lives in its own package — [built]
 
 Wire types belong in `packages/report-schema`, **not** in `packages/ui` and **not** in
 NestJS. Everyone depends on the contract; the contract depends on nothing.
@@ -79,7 +79,7 @@ Validation runs in three places for three reasons: Python validates its agents' 
 boundary per component, keyed by `id`. A user mid-walkthrough loses one panel, not the
 whole document.
 
-### Provenance is per-fact, first-class — [decided, shape open]
+### Provenance is per-fact, first-class — [built: type only; shape provisional]
 
 Citation granularity is per *fact* (a timeline event, a table cell), not per component. A
 `SourceRef` belongs both on base `ComponentProps` and on individual data points.
@@ -99,7 +99,7 @@ Citations must degrade for print: interactive highlight-in-the-PDF on screen, nu
 footnote markers plus a reference table on export. Same data, two presentations.
 **Hover-only citation is not acceptable** — it doesn't survive the export path.
 
-### Render context in the type system — [decided, not built]
+### Render context in the type system — [built: type + context; nothing lays out from it yet]
 
 No component owns its own dimensions. Every component receives a render context —
 approximately `{ medium: 'screen' | 'print' | 'slide', width, height }` — and lays out from
@@ -117,7 +117,7 @@ and desktop need resolution configured in their bundlers.
 `NodeGraph` is the first test of this (React Flow likely fits web/desktop and not mobile).
 Whether per-platform design becomes common or stays an exception is **[open]** pending that.
 
-### Versioning — [decided, not built]
+### Versioning — [built: `schemaVersion` on `ReportSpec`]
 
 Component/template schema version travels in the payload. Caching invalidates when the data
 changes **or** when component templates/designs change; including a renderer version in the
@@ -165,7 +165,7 @@ Components may own state, including calling next/prev API routes for paginated o
 data. Interactivity is decided per component: the user should be able to reach all the data
 they need on the frontend they're using, and design may differ across web/mobile/desktop.
 
-### Timeline — [decided, not built]
+### Timeline — [built: contract only; no temporal-axis rendering]
 
 One component with a `scale` prop, **not** two components. The difference between the two
 useful layouts is only the position function:
@@ -178,35 +178,74 @@ useful layouts is only the position function:
 
 Follow-ons:
 
-- `unitOfTime` currently does two jobs — axis tick granularity and per-event label
-  formatting. Split them. On a temporal scale, granularity should derive from the data range;
-  label format stays an author/agent choice. **Every field exposed to an agent is a field an
-  agent can get wrong** — keep the agent-facing surface minimal.
+- `unitOfTime` did two jobs — axis tick granularity and per-event label formatting.
+  Resolved by exposing **only** `labelUnit`: tick granularity is derived by the renderer from
+  the data range, so it is not an agent-facing field at all. **Every field exposed to an agent
+  is a field an agent can get wrong** — keep the agent-facing surface minimal.
 - Dense clusters need a defined answer (stacking, expandable clustering, or a broken/zoomable
   axis). Real extracted data will put nine events on one afternoon inside a five-year span.
   This is the interaction model, not a detail. **[open]**
 
+### Contract decisions made while building the schema package
+
+- **Direction values are semantic, not flex.** `forward` / `backward` / `down` / `up`, mapped
+  to flex by `DIRECTION_TO_FLEX` in `packages/ui`. The old enum's values were literally
+  `'row'` / `'row-reverse'` — an agent should not be choosing CSS. **[open]** `backward` is
+  still ambiguous (right-to-left, or reverse-chronological?); splitting into
+  `orientation` + `order` would remove the ambiguity if it bites.
+- **Timestamps accept ISO date *or* datetime.** Precision of knowledge is itself evidence: a
+  document saying "January 2023" must not be promoted to a fabricated `2023-01-01T00:00:00Z`.
+  **[open]** An explicit `precision` field is probably needed before `scale: 'time'` can
+  position such an event honestly.
+- **`SourceRef.bbox` is an array and carries `pageSize`.** A quoted fact spans lines, so one
+  ref needs many boxes; and a BOTTOMLEFT box cannot be flipped into the renderer's TOPLEFT
+  space without the page height.
+- **Per-event ReactNode became render props.** `oppositeContent` was a per-event field, which
+  cannot survive serialization. `Timeline` now takes `renderOppositeContent` / `renderEvent`
+  instead: the spec carries data, the renderer supplies nodes.
+- **Enums are const objects, not TS `enum`s.** They do not round-trip to JSON Schema.
+  `UnitOfTime.Year` call sites are unchanged.
+- **The emitted JSON Schema is committed** at `packages/report-schema/schema/`, not left in
+  gitignored `dist/`, because a separate Python repo cannot codegen against an unpushed file.
+  `pnpm --filter @repo/report-schema check:schema` fails if it drifts from the Zod source.
+
 ## Current state of the code
 
-Branch `CreateTimeline`. Scaffolding only — the types are further along than the rendering.
+The wire contract exists and is enforced; the rendering is still scaffolding.
 
-- `packages/ui/src/types.ts` — `ReportCanvasProps` (`{ data, components }`),
-  empty `ReportCanvasData`, `TamaguiComponentProps` (normalized press/hover/focus surface),
-  `ComponentProps`.
-- `packages/ui/src/ReportCanvas/ReportCanvas.tsx` — takes **no props**; hardcodes an `<H1>`
-  and a `<Timeline />`. The props contract is designed but not wired.
-- `packages/ui/src/ReportCanvas/Components/Timeline/types.ts` — `TimelineComponentProps`,
-  `TimelineEventProps`, `UnitOfTime`, `TimelineDirection` (enum values map directly onto flex
-  values), `TimeFormatterMap`, `DateMethodMap`.
-- `packages/ui/src/ReportCanvas/Components/Timeline/Timeline.tsx` — mock events inlined in
-  `useState`; renders a bare `XStack` of event cards. None of the time machinery is used yet:
-  no axis, no line, no `lineVariant`, no `oppositeContent`. `timelineData` is declared and
-  unused.
+- `packages/report-schema` (`@repo/report-schema`) — the wire contract, Zod as source of
+  truth, zero deps but zod. `source.ts` (SourceRef/BBox), `primitives.ts` (Timestamp,
+  UnitOfTime, LineVariant), `component.ts` (ComponentSpecBase), `timeline.ts`, `report.ts`
+  (the `kind` discriminated union + `ReportSpec`). Emits committed JSON Schema to `schema/`.
+  Re-exports `z` so consumers share one zod instance.
+- `packages/ui/src/types.ts` — renderer-side only now: `TamaguiComponentProps`, `Insets`,
+  `ReportCanvasProps`.
+- `packages/ui/src/ReportCanvas/ReportCanvas.tsx` — takes `report`, `safeParse`s each
+  component, switches on `kind`, wraps each in `ComponentErrorBoundary`. Validation failure
+  and render throw are two separate mechanisms; both produce a `ComponentErrorCard`.
+- `packages/ui/src/ReportCanvas/Components/Timeline/` — `types.ts` holds the props layer plus
+  the renderer lookups (`DIRECTION_TO_FLEX`, `TimeFormatterMap`, `DateMethodMap`);
+  `Timeline.tsx` is prop-driven, keyed by `event.id`. **No axis, no line, no temporal
+  positioning yet** — `scale` and `labelUnit` are carried but unused by the renderer.
+- `packages/ui/src/ReportCanvas/fixtures.ts` — `mockReport`, the data formerly inlined in
+  Timeline's `useState`. The three apps pass it explicitly.
+- `packages/ui/src/render-context.tsx` — `RenderContextProvider` / `useRenderContext` /
+  `useIsStaticMedium`. Defined, not yet consumed by any layout.
 
-Known gaps to fix: `apps/native/app/index.tsx` renders `ReportCanvas` **without** a
-`TamaguiProvider` (web and desktop both wrap it) — theming will not apply on native.
+Known gaps:
+
+- `apps/native/app/index.tsx` renders `ReportCanvas` **without** a `TamaguiProvider` (web and
+  desktop both wrap it) — theming will not apply on native. Pre-existing.
+- `packages/ui`'s `dev` watcher (`tsup --watch`) only watches its own `src`, so editing
+  `@repo/report-schema` mid-session does not retrigger ui's declaration emit. Runtime is
+  fine; `.d.ts` can go stale until the next build.
+- `apps/api-client` does not consume the contract yet. Reusing the Zod schemas for NestJS DTO
+  validation is the natural next step there.
 
 ## Immediate next work
 
-1. Split wire types from component props.
-2. Move wire types into `packages/report-schema`.
+1. Timeline's temporal axis (`scale: 'time'`), which needs the `precision` question answered.
+2. A second component (Table) — the first real test of whether adding a `kind` is mechanical.
+3. The chat/SSE session layer and the canvas mutation protocol
+   (append / replace-by-id / remove), which the current snapshot-shaped `ReportSpec`
+   deliberately does not yet support.

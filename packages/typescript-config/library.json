@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "./base.json",
+  "compilerOptions": {
+    /* For dependency-light, framework-free packages (no React, no DOM).
+       Deliberately overrides base.json's `moduleResolution: "node"`, which is
+       deprecated in TS 6 and removed in TS 7 — packages using this base are on
+       TS 6 and must not inherit that setting. */
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "noEmit": true,
+    "resolveJsonModule": true
+  },
+  "exclude": ["node_modules"]
+}

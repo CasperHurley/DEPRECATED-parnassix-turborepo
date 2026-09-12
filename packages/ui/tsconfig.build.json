@@ -13,6 +13,12 @@
     "emitDeclarationOnly": true,
     "declaration": true,
     "declarationMap": true,
+    /* tsc-alias resolves `@/*` against baseUrl; with baseUrl at the package root
+       it looked for dist/src/* (which rootDir strips) and silently left the
+       aliases unrewritten in the emitted .d.ts. Pointing baseUrl at src/ lines
+       it up with rootDir so the rewrite actually happens. */
+    "baseUrl": "./src",
+    "paths": { "@/*": ["./*"] },
     "rootDir": "src",
     "outDir": "dist"
   },

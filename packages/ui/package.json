@@ -17,6 +17,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@repo/report-schema": "workspace:*",
     "@tamagui/config": "^2.7.7",
     "@tamagui/core": "^2.7.7",
     "tamagui": "^2.7.7"

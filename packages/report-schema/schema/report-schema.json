@@ -1,0 +1,230 @@
+{
+  "$id": "https://aneural.dev/schema/report/0.1.0",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "minLength": 1
+    },
+    "data": {
+      "type": "object",
+      "properties": {},
+      "additionalProperties": {}
+    },
+    "components": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "source": {
+                "$ref": "#/$defs/__schema0"
+              },
+              "kind": {
+                "type": "string",
+                "const": "timeline"
+              },
+              "title": {
+                "type": "string"
+              },
+              "subtitle": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "scale": {
+                "default": "ordinal",
+                "type": "string",
+                "enum": [
+                  "ordinal",
+                  "time"
+                ]
+              },
+              "direction": {
+                "default": "forward",
+                "type": "string",
+                "enum": [
+                  "forward",
+                  "backward",
+                  "down",
+                  "up"
+                ]
+              },
+              "labelUnit": {
+                "type": "string",
+                "enum": [
+                  "second",
+                  "minute",
+                  "hour",
+                  "day",
+                  "week",
+                  "month",
+                  "year"
+                ]
+              },
+              "lineVariant": {
+                "$ref": "#/$defs/__schema1"
+              },
+              "events": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "timestamp": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                        },
+                        {
+                          "type": "string",
+                          "format": "date",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                        }
+                      ]
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "subtitle": {
+                      "type": "string"
+                    },
+                    "description": {
+                      "type": "string"
+                    },
+                    "lineVariant": {
+                      "$ref": "#/$defs/__schema1"
+                    },
+                    "source": {
+                      "$ref": "#/$defs/__schema0"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "timestamp",
+                    "title"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "id",
+              "kind",
+              "title",
+              "events"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "data",
+    "components"
+  ],
+  "$defs": {
+    "__schema0": {
+      "type": "object",
+      "properties": {
+        "documentId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "nodeId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "page": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "bbox": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "l": {
+                "type": "number"
+              },
+              "t": {
+                "type": "number"
+              },
+              "r": {
+                "type": "number"
+              },
+              "b": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "l",
+              "t",
+              "r",
+              "b"
+            ]
+          }
+        },
+        "coordOrigin": {
+          "default": "bottomleft",
+          "type": "string",
+          "enum": [
+            "topleft",
+            "bottomleft"
+          ]
+        },
+        "pageSize": {
+          "type": "object",
+          "properties": {
+            "width": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "height": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          },
+          "required": [
+            "width",
+            "height"
+          ]
+        },
+        "chunkId": {
+          "type": "string"
+        },
+        "quotedText": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "documentId",
+        "nodeId",
+        "page"
+      ]
+    },
+    "__schema1": {
+      "type": "string",
+      "enum": [
+        "solid",
+        "dashed",
+        "dotted",
+        "none"
+      ]
+    }
+  }
+}

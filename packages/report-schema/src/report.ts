@@ -11,6 +11,7 @@ import { TimelineSpecSchema } from "./timeline";
  */
 export const ComponentSpecSchema = z.discriminatedUnion("kind", [TimelineSpecSchema]);
 export type ComponentSpec = z.infer<typeof ComponentSpecSchema>;
+export type ComponentSpecInput = z.input<typeof ComponentSpecSchema>;
 
 /** Component `kind` values, for exhaustiveness checks in the renderer. */
 export type ComponentKind = ComponentSpec["kind"];
@@ -38,6 +39,21 @@ export const ReportSpecSchema = z.object({
   components: z.array(ComponentSpecSchema),
 });
 export type ReportSpec = z.infer<typeof ReportSpecSchema>;
+/**
+ * A report as it arrives: the shape an agent emits and the wire carries, before
+ * `safeParse` fills in defaults. Distinct from `ReportSpec`, which is what the
+ * renderer holds AFTER validation — anything reading unvalidated input should
+ * say so in its types rather than claim a guarantee it has not checked.
+ */
+export type ReportSpecInput = z.input<typeof ReportSpecSchema>;
 
-/** Bump when a change to any component spec is not backward compatible. */
-export const SCHEMA_VERSION = "0.3.0";
+/**
+ * Bump when a change to any component spec is not backward compatible.
+ *
+ * 0.5.0 added `millisecond` to `TimePrecision` and `UnitOfTime`. Unlike `spans`
+ * in 0.4.0 — an optional field an older client simply strips — a new ENUM member
+ * is not backward compatible in the other direction: an older renderer handed
+ * `precision: "millisecond"` fails validation and shows an error card, because
+ * an invented value in a KNOWN field is exactly what the contract refuses.
+ */
+export const SCHEMA_VERSION = "0.5.0";

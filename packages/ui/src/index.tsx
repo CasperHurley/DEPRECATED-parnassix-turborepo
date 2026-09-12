@@ -3,13 +3,42 @@ export * from "tamagui";
 export { ReportCanvas } from "./ReportCanvas/ReportCanvas";
 export { ComponentErrorCard } from "./ReportCanvas/ComponentErrorCard";
 export { ComponentErrorBoundary } from "./ReportCanvas/ComponentErrorBoundary";
-export { mockReport } from "./ReportCanvas/fixtures";
-export { Timeline, TimelineEvent } from "./ReportCanvas/Components/Timeline/Timeline";
 export {
-  LAYOUT_TO_FLEX,
-  DateMethodMap,
+  mockLogTimeline,
+  mockOrdinalTimeline,
+  mockReport,
+  mockTimeScaleTimeline,
+} from "./ReportCanvas/fixtures";
+export {
+  Timeline,
+  OrdinalTimeline,
+  TimelineEvent,
+} from "./ReportCanvas/Components/Timeline/Timeline";
+export {
+  CARD_HEIGHT,
+  CARD_WIDTH,
+  EventCardBody,
+  TimelineHeader,
+  cardChrome,
+  formatEventPeriods,
+} from "./ReportCanvas/Components/Timeline/card";
+export { LAYOUT_TO_FLEX } from "./ReportCanvas/Components/Timeline/types";
+export {
+  AXIS_PLACEMENT,
+  AXIS_TICK_FORMAT,
+  MIN_SEPARATION,
+  MIN_VISIBLE_EXTENT,
   TimeFormatterMap,
-} from "./ReportCanvas/Components/Timeline/types";
+  packGroupLanes,
+  axisOffsetMinutes,
+  computeTimeDomain,
+  computeTimelineLayout,
+  deriveTickUnit,
+  formatOffset,
+  generateTicks,
+  groupTimelineEvents,
+  pct,
+} from "./ReportCanvas/Components/Timeline/axis";
 export {
   RenderContextProvider,
   defaultRenderContext,
@@ -32,10 +61,23 @@ export type {
   TamaguiComponentProps,
 } from "./types";
 export type {
-  DateMethods,
   TimelineEventProps,
   TimelineProps,
 } from "./ReportCanvas/Components/Timeline/types";
+export type { EventCardBodyProps } from "./ReportCanvas/Components/Timeline/card";
+export type {
+  AxisPlacement,
+  AxisTick,
+  EventGroup,
+  PlacedEvent,
+  PlacedGroup,
+  PositionedEvent,
+  PositionedSpan,
+  TimeDomain,
+  TimelineLayout,
+  TimelineLayoutOptions,
+  UndatedEvent,
+} from "./ReportCanvas/Components/Timeline/axis";
 export type { RenderContextValue, RenderMedium } from "./render-context";
 
 /* The wire contract, re-exported so apps have a single import site. */
@@ -43,16 +85,29 @@ export type {
   BBox,
   ComponentKind,
   ComponentSpec,
+  ComponentSpecInput,
   ReportData,
   ReportSpec,
+  ReportSpecInput,
   SourceRef,
+  TimeInterval,
+  TimeSpan,
   TimelineEventSpec,
+  TimelineEventSpecInput,
   TimelineSpec,
+  TimelineSpecInput,
 } from "@repo/report-schema";
 export {
   PRECISION_FORMAT,
+  addUnits,
+  floorToUnit,
+  eventIntervals,
   formatTimestamp,
+  labelPrecision,
+  offsetMinutesOf,
+  spanInterval,
   resolveTimePrecision,
+  timestampInterval,
   timestampSupportsPrecision,
   CoordOrigin,
   LineVariant,

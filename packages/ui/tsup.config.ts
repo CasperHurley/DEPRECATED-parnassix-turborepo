@@ -7,10 +7,12 @@ export default defineConfig((options: Options) => ({
   banner: {
     js: "'use client'",
   },
-  // tsup deletes dist/ before each rebuild; in watch mode that leaves a window
-  // where a running Vite dev server cannot resolve @repo/ui. Only clean on
-  // one-shot builds.
-  clean: !options.watch,
+  // Never clean: deleting dist/ leaves a window in which this package's
+  // package.json points at files that do not exist, and a consumer's watcher
+  // resolving there fails hard — Metro cannot resolve @repo/ui, and the native
+  // app surfaces that later as `undefined is not a function`. A single entry
+  // means every file is overwritten in place, so cleaning buys nothing.
+  clean: false,
   format: ["cjs", "esm"],
   // @repo/report-schema and zod stay external: schema objects created by two
   // different copies of zod are not interchangeable, and consumers resolve the

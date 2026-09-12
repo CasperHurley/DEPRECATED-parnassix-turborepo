@@ -1,45 +1,26 @@
-import React from "react";
-import {
-    LAYOUT_TO_FLEX,
-    TimelineEventProps,
-    TimelineProps,
-} from './types'
-import { Section, XStack, YStack, Text } from "tamagui";
+import * as React from "react";
+import { Section } from "tamagui";
+import { TimelineScale } from "@repo/report-schema";
+import { TimeScaleTimeline } from "./TimeScaleTimeline";
+import { OrdinalTimeline } from "./OrdinalTimeline";
+import type { TimelineProps } from "./types";
 
-export function Timeline({
-    events,
-    orientation,
-    order,
-    renderEvent,
-    renderOppositeContent,
-    children,
-}: TimelineProps) {
-    if (children) return <Section>{children}</Section>;
-
-    return (
-        <Section>
-            <XStack flexDirection={LAYOUT_TO_FLEX[orientation][order]} jc="space-between">
-                {events.map((event, index) => (
-                    <React.Fragment key={event.id}>
-                        {renderEvent?.(event, index) ?? (
-                            <TimelineEvent
-                                {...event}
-                                oppositeContent={renderOppositeContent?.(event, index)}
-                            />
-                        )}
-                    </React.Fragment>
-                ))}
-            </XStack>
-        </Section>
-    );
+/**
+ * One component, two position functions.
+ *
+ * `ordinal` spaces events evenly and lays out with flex; `time` spaces them in
+ * proportion to their timestamps and has to position absolutely, because flex
+ * cannot express proportion. Everything else — the spec, the card, the header,
+ * the render props, the error handling — is shared, which is why this is a
+ * `scale` prop rather than two components an agent would have to choose between.
+ */
+export function Timeline(props: TimelineProps) {
+  if (props.children) return <Section>{props.children}</Section>;
+  return props.scale === TimelineScale.Time ? (
+    <TimeScaleTimeline {...props} />
+  ) : (
+    <OrdinalTimeline {...props} />
+  );
 }
 
-export const TimelineEvent: React.FC<TimelineEventProps> = (props) => {
-    return (
-        <YStack>
-            <Text>{props.title}</Text>
-            <Text>{props.subtitle}</Text>
-            <Text>{props.description}</Text>
-        </YStack>
-    )
-}
+export { OrdinalTimeline, TimelineEvent } from "./OrdinalTimeline";

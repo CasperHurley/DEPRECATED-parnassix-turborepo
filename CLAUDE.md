@@ -69,7 +69,7 @@ NestJS. Everyone depends on the contract; the contract depends on nothing.
 - NestJS reuses the same Zod schemas for DTO validation rather than a parallel
   class-validator set.
 - Keeping it out of `packages/ui` also keeps schema consumers away from that package's
-  Tamagui deps and TS 5.9 pin.
+  Tamagui deps.
 
 Validation runs in three places for three reasons: Python validates its agents' output
 (the retry loop), NestJS validates the public boundary, the frontend validates at the

@@ -48,7 +48,7 @@ All three UI apps import from `@repo/ui`, so a component or theme token changes 
 
 **Tooling**
 
-- [TypeScript](https://www.typescriptlang.org) 6 (5.9 in `@repo/ui`, see below)
+- [TypeScript](https://www.typescriptlang.org) 6 everywhere
 - [oxlint](https://oxc.rs) — linting
 - [Vitest](https://vitest.dev) 4 — tests in `api-client`
 - [tsup](https://tsup.egoist.dev) — builds `@repo/ui`
@@ -108,8 +108,8 @@ Two settings in `pnpm-workspace.yaml` are load-bearing. Both exist because of ho
 
 Two smaller things worth knowing:
 
-- `@repo/ui` stays on TypeScript 5.9 while the apps use 6.x. TypeScript 6 errors on a `baseUrl` that `tsup` injects during its declaration build, which isn't removable from config.
-- `packages/typescript-config/base.json` still sets `moduleResolution: "node"`, deprecated in TS 6 and removed in TS 7. It will need modernizing to `"bundler"`.
+- `packages/typescript-config/base.json` uses `moduleResolution: "bundler"`. Don't put `"node"` (node10) back: it is deprecated in TS 6, removed in TS 7, and it ignores package `exports` maps, which is how modern dependencies expose their types.
+- No package sets `baseUrl` or `paths`. `baseUrl` is deprecated in TS 6, and the `@/` alias it supported also required a `tsc-alias` post-pass that could — and did — silently no-op, shipping `.d.ts` files with unresolvable specifiers that `skipLibCheck` then hid. Use relative imports inside a package.
 
 ## Adding a component
 

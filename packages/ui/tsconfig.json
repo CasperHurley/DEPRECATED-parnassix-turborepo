@@ -3,13 +3,6 @@
   "include": ["."],
   "exclude": ["dist", "build", "node_modules"],
   "compilerOptions": {
-    "strict": true,
-    /* `@/` resolves to this package's src/. Safe to use for internal imports:
-       tsup/esbuild inlines the alias when bundling, so the alias never appears
-       in the published JS. */
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["./src/*"]
-    }
+    "strict": true
   }
 }

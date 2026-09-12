@@ -6,10 +6,10 @@ import {
   type ComponentKind,
   type ComponentSpec,
 } from "@repo/report-schema";
-import { Timeline } from "@/ReportCanvas/Components/Timeline/Timeline";
-import { ComponentErrorBoundary } from "@/ReportCanvas/ComponentErrorBoundary";
-import { ComponentErrorCard } from "@/ReportCanvas/ComponentErrorCard";
-import { ReportCanvasProps } from "@/types";
+import { Timeline } from "./Components/Timeline/Timeline";
+import { ComponentErrorBoundary } from "./ComponentErrorBoundary";
+import { ComponentErrorCard } from "./ComponentErrorCard";
+import { ReportCanvasProps } from "../types";
 
 export function ReportCanvas({ report }: ReportCanvasProps) {
   return (

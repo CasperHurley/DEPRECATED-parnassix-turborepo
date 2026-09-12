@@ -3,7 +3,7 @@ import {
     LAYOUT_TO_FLEX,
     TimelineEventProps,
     TimelineProps,
-} from '@/ReportCanvas/Components/Timeline/types'
+} from './types'
 import { Section, XStack, YStack, Text } from "tamagui";
 
 export function Timeline({

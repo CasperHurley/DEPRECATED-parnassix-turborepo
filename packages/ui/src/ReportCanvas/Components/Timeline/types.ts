@@ -7,7 +7,7 @@ import type {
     UnitOfTime,
 } from '@repo/report-schema';
 import { TimelineOrder as Order, TimelineOrientation as Orientation } from '@repo/report-schema';
-import { TamaguiComponentProps } from '@/types';
+import { TamaguiComponentProps } from '../../../types';
 
 /**
  * Renderer-side Timeline types.

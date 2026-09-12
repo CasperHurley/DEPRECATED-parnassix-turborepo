@@ -1,6 +1,12 @@
 import { z } from "zod";
 import { SourceRefSchema } from "./source";
-import { LineVariantSchema, TimestampSchema, UnitOfTimeSchema } from "./primitives";
+import {
+  LineVariantSchema,
+  TimePrecisionSchema,
+  TimestampSchema,
+  UnitOfTimeSchema,
+  timestampSupportsPrecision,
+} from "./primitives";
 import { ComponentSpecBaseSchema } from "./component";
 
 /**
@@ -65,12 +71,20 @@ export const TimelineEventSpecSchema = z.object({
    */
   id: z.string().min(1),
   timestamp: TimestampSchema,
+  /**
+   * How much of `timestamp` the source actually establishes. Omitted means
+   * "as precise as the string looks" — see resolveTimePrecision.
+   */
+  precision: TimePrecisionSchema.optional(),
   title: z.string(),
   subtitle: z.string().optional(),
   description: z.string().optional(),
   lineVariant: LineVariantSchema.optional(),
   /** Where this specific event came from. Citations are per-fact. */
   source: SourceRefSchema.optional(),
+}).refine((event) => timestampSupportsPrecision(event.timestamp, event.precision ?? "day"), {
+  message: "precision is finer than the timestamp supports (no time-of-day component)",
+  path: ["precision"],
 });
 export type TimelineEventSpec = z.infer<typeof TimelineEventSpecSchema>;
 

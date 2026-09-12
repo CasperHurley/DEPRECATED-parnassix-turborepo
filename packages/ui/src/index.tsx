@@ -50,11 +50,16 @@ export type {
   TimelineSpec,
 } from "@repo/report-schema";
 export {
+  PRECISION_FORMAT,
+  formatTimestamp,
+  resolveTimePrecision,
+  timestampSupportsPrecision,
   CoordOrigin,
   LineVariant,
   SCHEMA_VERSION,
   TimelineOrder,
   TimelineOrientation,
+  TimePrecision,
   TimelineScale,
   UnitOfTime,
 } from "@repo/report-schema";

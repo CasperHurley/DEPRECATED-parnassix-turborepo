@@ -1,5 +1,5 @@
 {
-  "$id": "https://aneural.dev/schema/report/0.2.0",
+  "$id": "https://aneural.dev/schema/report/0.3.0",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "properties": {
@@ -84,37 +84,28 @@
                   "type": "object",
                   "properties": {
                     "id": {
-                      "type": "string",
-                      "minLength": 1
+                      "$ref": "#/$defs/__schema2"
                     },
                     "timestamp": {
-                      "anyOf": [
-                        {
-                          "type": "string",
-                          "format": "date-time",
-                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
-                        },
-                        {
-                          "type": "string",
-                          "format": "date",
-                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
-                        }
-                      ]
+                      "$ref": "#/$defs/__schema3"
+                    },
+                    "precision": {
+                      "$ref": "#/$defs/__schema4"
                     },
                     "title": {
-                      "type": "string"
+                      "$ref": "#/$defs/__schema5"
                     },
                     "subtitle": {
-                      "type": "string"
+                      "$ref": "#/$defs/__schema6"
                     },
                     "description": {
-                      "type": "string"
+                      "$ref": "#/$defs/__schema7"
                     },
                     "lineVariant": {
-                      "$ref": "#/$defs/__schema1"
+                      "$ref": "#/$defs/__schema8"
                     },
                     "source": {
-                      "$ref": "#/$defs/__schema0"
+                      "$ref": "#/$defs/__schema9"
                     }
                   },
                   "required": [
@@ -231,6 +222,50 @@
         "dotted",
         "none"
       ]
+    },
+    "__schema2": {
+      "type": "string",
+      "minLength": 1
+    },
+    "__schema3": {
+      "anyOf": [
+        {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        {
+          "type": "string",
+          "format": "date",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+        }
+      ]
+    },
+    "__schema4": {
+      "type": "string",
+      "enum": [
+        "year",
+        "month",
+        "day",
+        "hour",
+        "minute",
+        "second"
+      ]
+    },
+    "__schema5": {
+      "type": "string"
+    },
+    "__schema6": {
+      "type": "string"
+    },
+    "__schema7": {
+      "type": "string"
+    },
+    "__schema8": {
+      "$ref": "#/$defs/__schema1"
+    },
+    "__schema9": {
+      "$ref": "#/$defs/__schema0"
     }
   }
 }

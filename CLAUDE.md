@@ -196,10 +196,27 @@ Follow-ons:
   as either "right-to-left" or "reverse-chronological". An agent choosing between those two
   readings had no way to know which was meant. Same four combinations, no ambiguity.
   `order` sets the direction of the axis; the renderer does not re-sort events.
-- **Timestamps accept ISO date *or* datetime.** Precision of knowledge is itself evidence: a
-  document saying "January 2023" must not be promoted to a fabricated `2023-01-01T00:00:00Z`.
-  **[open]** An explicit `precision` field is probably needed before `scale: 'time'` can
-  position such an event honestly.
+- **Timestamps carry a canonical instant plus an explicit `precision`.** Precision of
+  knowledge is itself evidence: a document saying "March 2019" must not be promoted to a
+  fabricated `2019-03-01T00:00:00Z`. `timestamp` holds the canonical instant, `precision`
+  (`year`…`second`, no `week`) says how much of it to believe, and the renderer must never
+  display or position an event more precisely than that allows.
+  - `precision` is **optional and derived when absent** (`resolveTimePrecision`), so it stays
+    off the agent-facing surface for the common case. An agent sets it only when the source
+    is *vaguer* than the timestamp string looks.
+  - A precision finer than the string supports (date-only claimed to the minute) is
+    **rejected** — that is incoherent, not merely imprecise.
+  - **Caveat: JSON Schema cannot express this cross-field rule**, so the emitted artifact does
+    not carry it and `datamodel-code-generator` will not reproduce it. The Python side needs
+    its own validator or the pair passes Pydantic and fails here. Pinned by a test.
+- **`formatTimestamp` renders in the zone the timestamp was written in, never the viewer's**,
+  and lives in `@repo/report-schema` rather than a renderer. Both follow from the same
+  requirement: two people in different timezones looking at the same evidence must see the
+  same time, and the guarantee has to hold identically on web, native, and in an exported
+  PDF. A local-zone shift can move an event across a day boundary or reorder it against a
+  neighbour — material when the timeline *is* the argument. (`TimeFormatterMap` and
+  `DateMethodMap` stay in `packages/ui`: those are axis labelling and layout arithmetic, not
+  claims about evidence.)
 - **`SourceRef.bbox` is an array and carries `pageSize`.** A quoted fact spans lines, so one
   ref needs many boxes; and a BOTTOMLEFT box cannot be flipped into the renderer's TOPLEFT
   space without the page height.
@@ -250,7 +267,9 @@ Known gaps:
 
 ## Immediate next work
 
-1. Timeline's temporal axis (`scale: 'time'`), which needs the `precision` question answered.
+1. Timeline's temporal axis (`scale: 'time'`). The `precision` question it was blocked on is
+   now answered — positioning must honour `resolveTimePrecision`, so a month-precision event
+   occupies its month rather than a point.
 2. A second component (Table) — the first real test of whether adding a `kind` is mechanical.
 3. The chat/SSE session layer and the canvas mutation protocol
    (append / replace-by-id / remove), which the current snapshot-shaped `ReportSpec`

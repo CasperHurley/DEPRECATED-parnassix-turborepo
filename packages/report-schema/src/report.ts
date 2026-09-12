@@ -40,4 +40,4 @@ export const ReportSpecSchema = z.object({
 export type ReportSpec = z.infer<typeof ReportSpecSchema>;
 
 /** Bump when a change to any component spec is not backward compatible. */
-export const SCHEMA_VERSION = "0.2.0";
+export const SCHEMA_VERSION = "0.3.0";

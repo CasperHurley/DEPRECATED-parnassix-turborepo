@@ -4,7 +4,6 @@
   "exclude": ["dist", "build", "node_modules"],
   "compilerOptions": {
     "strict": true,
-    "ignoreDeprecations": "6.0",
     /* `@/` resolves to this package's src/. Safe to use for internal imports:
        tsup/esbuild inlines the alias when bundling, so the alias never appears
        in the published JS. */

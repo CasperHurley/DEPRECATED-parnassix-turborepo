@@ -18,6 +18,7 @@ A cross-platform monorepo: one shared Tamagui component layer rendered by a web 
 | Package                                                  | Purpose                                                                                                                      |
 | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
 | `packages/ui` (`@repo/ui`)                               | The shared design system. Re-exports all of Tamagui plus the single shared `config`, built to CJS + ESM + types with `tsup`. |
+| `packages/report-schema` (`@repo/report-schema`)          | The wire contract between the agents and the renderer. Zod schemas are the source of truth; emits committed JSON Schema for the Python service to generate Pydantic models from. |
 | `packages/typescript-config` (`@repo/typescript-config`) | Shared `tsconfig.json` bases.                                                                                                |
 
 All three UI apps import from `@repo/ui`, so a component or theme token changes in one place and lands everywhere.

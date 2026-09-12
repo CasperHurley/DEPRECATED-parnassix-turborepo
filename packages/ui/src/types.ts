@@ -1,14 +1,20 @@
 import { GestureResponderEvent, NativeMouseEvent } from 'react-native';
 import { FocusEvent, MouseEvent } from 'react';
+import type { ReportSpec } from '@repo/report-schema';
 
-export interface ReportCanvasProps {
-    data: ReportCanvasData;
-    components: ComponentProps[];
-}
-
-export interface ReportCanvasData {
-
-}
+/**
+ * Renderer-side types.
+ *
+ * The wire contract — everything an agent emits and everything that crosses a
+ * wire — lives in @repo/report-schema. What stays here is the React/Tamagui
+ * half: event handlers, ReactNode slots, and anything typed against
+ * react-native. None of that is serializable, which is exactly why the two
+ * layers are separate. See CLAUDE.md ("Two type layers, kept separate").
+ *
+ * The pattern for any component is:
+ *
+ *   type FooProps = FooSpec & TamaguiComponentProps & { children?: ReactNode }
+ */
 
 export interface TamaguiComponentProps {
     // DOCS: https://tamagui.dev/docs/intro/props
@@ -37,6 +43,11 @@ export type Insets = {
     right?: number;
 };
 
-export interface ComponentProps extends TamaguiComponentProps {
-    id: string;
-}
+export type ReportCanvasProps = {
+    /**
+     * The report to render. Typed as the wire spec because that is exactly what
+     * arrives from the API — the canvas revalidates it rather than trusting the
+     * type, since a compile-time type proves nothing about a network payload.
+     */
+    report: ReportSpec;
+} & TamaguiComponentProps;

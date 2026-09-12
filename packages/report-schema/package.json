@@ -1,0 +1,39 @@
+{
+  "name": "@repo/report-schema",
+  "version": "0.0.0",
+  "private": true,
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    },
+    "./json-schema": "./schema/report-schema.json",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "tsup && tsc -p tsconfig.build.json && node scripts/emit-json-schema.mjs",
+    "dev": "tsup --watch --onSuccess \"tsc -p tsconfig.build.json\"",
+    "lint": "oxlint src/ test/",
+    "test": "vitest run",
+    "clean": "rm -rf dist",
+    "check:schema": "node scripts/emit-json-schema.mjs --check"
+  },
+  "dependencies": {
+    "zod": "^4.6.2"
+  },
+  "devDependencies": {
+    "@repo/typescript-config": "workspace:*",
+    "oxlint": "^1.79.0",
+    "tsup": "^8.0.1",
+    "typescript": "~6.0.2",
+    "vitest": "^4.0.0"
+  },
+  "files": [
+    "dist",
+    "schema"
+  ]
+}

@@ -5,6 +5,7 @@ import {
   YStack,
   ReportCanvas,
   config,
+  mockReport,
 } from "@repo/ui";
 
 function App() {
@@ -20,7 +21,7 @@ function App() {
           inset={0} 
           position={'absolute'}
         >
-          <ReportCanvas />
+          <ReportCanvas report={mockReport} />
         </YStack>
       </Theme>
     </TamaguiProvider>

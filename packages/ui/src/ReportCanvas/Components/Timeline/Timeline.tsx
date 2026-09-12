@@ -1,51 +1,33 @@
-import React, { useState } from "react";
-import { TimelineComponentProps, TimelineEventProps, UnitOfTime, TimelineDirection } from '@/ReportCanvas/Components/Timeline/types'
+import React from "react";
+import {
+    LAYOUT_TO_FLEX,
+    TimelineEventProps,
+    TimelineProps,
+} from '@/ReportCanvas/Components/Timeline/types'
 import { Section, XStack, YStack, Text } from "tamagui";
 
-export function Timeline() {
-
-    const timelineEventsMock: TimelineEventProps[] = [
-        {
-            timestamp: "2023-01-01",
-            title: "Event 1",
-            subtitle: "Subtitle 1",
-            description: "Description 1",
-            lineVariant: "solid",
-            oppositeContent: "Opposite Content 1",
-        },
-        {
-            timestamp: "2023-02-01",
-            title: "Event 2",
-            subtitle: "Subtitle 2",
-            description: "Description 2",
-            lineVariant: "dashed",
-            oppositeContent: "Opposite Content 2",
-        },
-        {
-            timestamp: "2023-03-01",
-            title: "Event 3",
-            subtitle: "Subtitle 3",
-            description: "Description 3",
-            lineVariant: "dotted",
-            oppositeContent: "Opposite Content 3",
-        },
-    ];
-    const [componentProps, setComponentProps] = useState<TimelineComponentProps>({
-        id: "timeline1",
-        title: "Timeline One",
-        subtitle: "",
-        description: "",
-        unitOfTime: UnitOfTime.Year,
-        direction: TimelineDirection.FORWARD,
-        events: timelineEventsMock,
-    })
-    const [timelineData, setTimelineData] = useState({})
+export function Timeline({
+    events,
+    orientation,
+    order,
+    renderEvent,
+    renderOppositeContent,
+    children,
+}: TimelineProps) {
+    if (children) return <Section>{children}</Section>;
 
     return (
         <Section>
-            <XStack flexDirection={componentProps.direction} jc="space-between">
-                {componentProps.events.map((event, index) => (
-                    <TimelineEvent key={index} {...event} />
+            <XStack flexDirection={LAYOUT_TO_FLEX[orientation][order]} jc="space-between">
+                {events.map((event, index) => (
+                    <React.Fragment key={event.id}>
+                        {renderEvent?.(event, index) ?? (
+                            <TimelineEvent
+                                {...event}
+                                oppositeContent={renderOppositeContent?.(event, index)}
+                            />
+                        )}
+                    </React.Fragment>
                 ))}
             </XStack>
         </Section>

@@ -137,6 +137,7 @@ const EDGE_ZONE = 0.12;
  * a property of the evidence, not of how wide the viewport happens to be.
  */
 const PRECISION_EMPHASIS: Record<TimePrecision, number> = {
+  [TimePrecision.Millisecond]: 1,
   [TimePrecision.Second]: 1,
   [TimePrecision.Minute]: 1,
   [TimePrecision.Hour]: 0.8,

@@ -241,8 +241,19 @@ Follow-ons:
   - `precision` is **optional and derived when absent** (`resolveTimePrecision`), so it stays
     off the agent-facing surface for the common case. An agent sets it only when the source
     is *vaguer* than the timestamp string looks.
-  - A precision finer than the string supports (date-only claimed to the minute) is
-    **rejected** — that is incoherent, not merely imprecise.
+  - A precision finer than the string supports (date-only claimed to the minute, or
+    `millisecond` on a timestamp that writes no fraction) is **rejected** — that is
+    incoherent, not merely imprecise.
+  - **The scale bottoms out at `millisecond`, because machine-generated evidence is
+    evidence.** Server logs, audit trails and transaction records establish a time to the
+    millisecond, and with those sources the ORDER is frequently the whole argument — which
+    write landed first, whether the transfer preceded the instruction it claims to authorise.
+    Stopping at `second` did not make the contract more careful: fractional seconds were
+    accepted on the wire and silently floored, so two writes 800ms apart shared a position and
+    a label. That is the same over-claim the precision scale exists to prevent, pointing the
+    other way. `UnitOfTime` gained `millisecond` alongside it so the tick ladder can resolve a
+    sub-second window at all; below a millisecond the contract stops, and finer digits are
+    truncated rather than kept as resolution nothing can position or display.
   - **Caveat: JSON Schema cannot express this cross-field rule**, so the emitted artifact does
     not carry it and `datamodel-code-generator` will not reproduce it. The Python side needs
     its own validator or the pair passes Pydantic and fails here. Pinned by a test.
@@ -395,6 +406,13 @@ groupId: z.string().min(1).optional(),
 `0.3.0` → `0.4.0`, `schema/report-schema.json` was regenerated and committed, and Python
 regenerates its Pydantic models from it. An older renderer reading a newer spec strips the new
 fields and still renders every event once, at its primary time.
+
+`0.5.0` added `millisecond` to `TimePrecision` and `UnitOfTime`, and that one is **not**
+backward compatible in the same way: a new optional field is stripped by an older client, but
+a new ENUM member is not — an older renderer handed `precision: "millisecond"` fails
+validation and shows an error card, because an invented value in a KNOWN field is exactly what
+the contract refuses. Adding an enum member is therefore always a version negotiation, never a
+silent upgrade.
 
 The cross-field rules in `timeSpanIssues` are `superRefine`s, so — as with `precision` — they
 do **not** appear in the emitted artifact and `datamodel-code-generator` will not reproduce

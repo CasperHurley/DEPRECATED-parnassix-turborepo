@@ -113,6 +113,7 @@ const STEP_SLOT = CARD_WIDTH + 16;
  * it with weight instead keeps the same fact visible on both scales.
  */
 const PRECISION_EMPHASIS: Record<TimePrecision, number> = {
+  [TimePrecision.Millisecond]: 1,
   [TimePrecision.Second]: 1,
   [TimePrecision.Minute]: 1,
   [TimePrecision.Hour]: 0.8,

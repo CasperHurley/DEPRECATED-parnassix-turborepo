@@ -47,5 +47,13 @@ export type ReportSpec = z.infer<typeof ReportSpecSchema>;
  */
 export type ReportSpecInput = z.input<typeof ReportSpecSchema>;
 
-/** Bump when a change to any component spec is not backward compatible. */
-export const SCHEMA_VERSION = "0.4.0";
+/**
+ * Bump when a change to any component spec is not backward compatible.
+ *
+ * 0.5.0 added `millisecond` to `TimePrecision` and `UnitOfTime`. Unlike `spans`
+ * in 0.4.0 — an optional field an older client simply strips — a new ENUM member
+ * is not backward compatible in the other direction: an older renderer handed
+ * `precision: "millisecond"` fails validation and shows an error card, because
+ * an invented value in a KNOWN field is exactly what the contract refuses.
+ */
+export const SCHEMA_VERSION = "0.5.0";

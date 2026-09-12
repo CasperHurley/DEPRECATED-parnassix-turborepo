@@ -185,6 +185,57 @@ export const mockOrdinalTimeline: TimelineSpecInput = {
 };
 
 /**
+ * A sub-second window from a machine source.
+ *
+ * The case `millisecond` precision was added for. Every event here falls inside
+ * one second, so at second resolution they would share a position entirely and
+ * the ordering — which is the whole argument with logs — would be unreadable.
+ * The axis ticks in milliseconds and the gaps between the writes are the point.
+ */
+export const mockLogTimeline: TimelineSpecInput = {
+    kind: "timeline",
+    id: "timeline-log",
+    title: "Transfer sequence",
+    subtitle: "Server log, one second wide — the ordering is the argument",
+    scale: TimelineScale.Time,
+    orientation: TimelineOrientation.Horizontal,
+    order: TimelineOrder.Ascending,
+    lineVariant: "solid",
+    events: [
+        {
+            id: "request",
+            timestamp: "2019-07-16T02:05:11.042Z",
+            title: "Request received",
+            subtitle: "api-gateway",
+        },
+        {
+            id: "auth",
+            timestamp: "2019-07-16T02:05:11.198Z",
+            title: "Authorisation granted",
+            subtitle: "auth-service",
+        },
+        {
+            id: "debit",
+            timestamp: "2019-07-16T02:05:11.203Z",
+            title: "Account debited",
+            subtitle: "Five milliseconds after authorisation",
+            lineVariant: "dashed",
+        },
+        {
+            id: "instruction",
+            timestamp: "2019-07-16T02:05:11.560Z",
+            title: "Instruction written",
+            subtitle: "Recorded AFTER the debit it authorises",
+        },
+        {
+            id: "ack",
+            timestamp: "2019-07-16T02:05:11.884Z",
+            title: "Acknowledgement sent",
+        },
+    ],
+};
+
+/**
  * The report the three apps render.
  *
  * Driven by props rather than by anything the component fabricates for itself —
@@ -195,5 +246,5 @@ export const mockOrdinalTimeline: TimelineSpecInput = {
 export const mockReport: ReportSpecInput = {
     schemaVersion: SCHEMA_VERSION,
     data: {},
-    components: [mockOrdinalTimeline, mockTimeScaleTimeline],
+    components: [mockOrdinalTimeline, mockTimeScaleTimeline, mockLogTimeline],
 };

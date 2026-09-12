@@ -629,3 +629,61 @@ describe("cards in one lane are always at least a card apart", () => {
     }
   });
 });
+
+describe("an axis can resolve a machine-log window", () => {
+  const at = (id: string, timestamp: string) =>
+    ({ id, title: id, timestamp }) as TimelineEventSpec;
+
+  it("ticks in milliseconds when the whole span is under a second", () => {
+    // At second resolution this domain snaps out to one tick and every event
+    // lands on top of every other — the ordering logs exist to record is lost.
+    const layout = computeTimelineLayout([
+      at("a", "2019-07-16T02:05:11.042Z"),
+      at("b", "2019-07-16T02:05:11.884Z"),
+    ]);
+    expect(layout.domain!.unit).toBe(UnitOfTime.Millisecond);
+    expect(layout.ticks.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("keeps sub-second gaps proportional", () => {
+    const layout = computeTimelineLayout([
+      at("a", "2019-07-16T02:05:11.000Z"),
+      at("b", "2019-07-16T02:05:11.100Z"),
+      at("c", "2019-07-16T02:05:11.500Z"),
+    ]);
+    const p = byId(layout);
+    // b is 100ms after a; c is 400ms after b — four times the gap.
+    const first = p.b!.center - p.a!.center;
+    const second = p.c!.center - p.b!.center;
+    expect(second / first).toBeCloseTo(4, 6);
+  });
+
+  it("separates two writes five milliseconds apart", () => {
+    // The ordering question: which landed first. Both used to floor to the
+    // same second and become indistinguishable.
+    const layout = computeTimelineLayout([
+      at("auth", "2019-07-16T02:05:11.198Z"),
+      at("debit", "2019-07-16T02:05:11.203Z"),
+    ]);
+    const p = byId(layout);
+    expect(p.debit!.center).toBeGreaterThan(p.auth!.center);
+  });
+
+  it("puts millisecond ticks on real millisecond boundaries", () => {
+    const layout = computeTimelineLayout([
+      at("a", "2019-07-16T02:05:11.042Z"),
+      at("b", "2019-07-16T02:05:11.884Z"),
+    ]);
+    const step = layout.domain!.step;
+    for (const tick of layout.ticks) expect(tick.at % step).toBe(0);
+  });
+
+  it("still ticks coarsely when the span is long", () => {
+    // The new rungs must not capture spans that belong further up the ladder.
+    const layout = computeTimelineLayout([
+      at("a", "2016-01-01T00:00:00Z"),
+      at("b", "2021-01-01T00:00:00Z"),
+    ]);
+    expect(layout.domain!.unit).toBe(UnitOfTime.Year);
+  });
+});

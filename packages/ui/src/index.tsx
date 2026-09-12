@@ -4,6 +4,7 @@ export { ReportCanvas } from "./ReportCanvas/ReportCanvas";
 export { ComponentErrorCard } from "./ReportCanvas/ComponentErrorCard";
 export { ComponentErrorBoundary } from "./ReportCanvas/ComponentErrorBoundary";
 export {
+  mockLogTimeline,
   mockOrdinalTimeline,
   mockReport,
   mockTimeScaleTimeline,

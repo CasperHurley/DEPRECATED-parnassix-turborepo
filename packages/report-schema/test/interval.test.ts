@@ -10,7 +10,9 @@ import {
   eventIntervals,
   labelPrecision,
   offsetMinutesOf,
+  resolveTimePrecision,
   spanInterval,
+  timestampSupportsPrecision,
   timestampInterval,
 } from "../src";
 
@@ -401,5 +403,93 @@ describe("an event's own period obeys the same rules as its extra ones", () => {
     const parsed = event({ timestamp: "2019-03-01", somethingNewer: 42 });
     expect(parsed.success).toBe(true);
     expect(parsed.data as Record<string, unknown>).not.toHaveProperty("somethingNewer");
+  });
+});
+
+describe("machine-generated evidence keeps its milliseconds", () => {
+  it("derives millisecond precision when the source writes a fraction", () => {
+    // "As precise as the string looks" — a log line that resolved the
+    // millisecond said so, and the contract should not round that away.
+    expect(resolveTimePrecision("2019-07-15T09:12:00.100Z")).toBe(TimePrecision.Millisecond);
+    expect(resolveTimePrecision("2019-07-15T09:12:00Z")).toBe(TimePrecision.Second);
+  });
+
+  it("gives a millisecond-precision source exactly one millisecond", () => {
+    const iv = timestampInterval("2019-07-15T09:12:00.100Z")!;
+    expect(iv.start).toBe(Date.UTC(2019, 6, 15, 9, 12, 0, 100));
+    expect(iv.end - iv.start).toBe(1);
+  });
+
+  it("keeps two log lines 800ms apart at different positions", () => {
+    // The defect this precision was added to fix: both used to floor to the
+    // same second, so "which write landed first" became unanswerable.
+    const a = timestampInterval("2019-07-15T09:12:00.100Z")!;
+    const b = timestampInterval("2019-07-15T09:12:00.900Z")!;
+    expect(b.start - a.start).toBe(800);
+  });
+
+  it("pads a written fraction rather than reading it as a count", () => {
+    // ".1" is a tenth of a second, not one millisecond.
+    expect(timestampInterval("2019-07-15T09:12:00.1Z")!.start).toBe(
+      Date.UTC(2019, 6, 15, 9, 12, 0, 100),
+    );
+    expect(timestampInterval("2019-07-15T09:12:00.75Z")!.start).toBe(
+      Date.UTC(2019, 6, 15, 9, 12, 0, 750),
+    );
+  });
+
+  it("drops resolution finer than it can carry, rather than claiming it", () => {
+    // Microseconds are accepted on the wire and truncated: the contract cannot
+    // position or display them, so keeping the digits would over-claim.
+    expect(timestampInterval("2019-07-15T09:12:00.123456Z")!.start).toBe(
+      Date.UTC(2019, 6, 15, 9, 12, 0, 123),
+    );
+  });
+
+  it("rolls a millisecond over into the next second", () => {
+    expect(timestampInterval("2019-07-15T09:12:59.999Z")!.end).toBe(
+      Date.UTC(2019, 6, 15, 9, 13, 0, 0),
+    );
+  });
+
+  it("refuses millisecond precision the string does not support", () => {
+    // Same rule as minute precision on a date-only value: incoherent, not vague.
+    expect(timestampSupportsPrecision("2019-07-15T09:12:00Z", TimePrecision.Millisecond)).toBe(
+      false,
+    );
+    expect(timestampSupportsPrecision("2019-07-15T09:12:00.000Z", TimePrecision.Millisecond)).toBe(
+      true,
+    );
+    expect(
+      TimelineEventSpecSchema.safeParse({
+        id: "e", title: "t", timestamp: "2019-07-15T09:12:00Z", precision: "millisecond",
+      }).success,
+    ).toBe(false);
+  });
+
+  it("still lets a coarser stated precision floor the fraction", () => {
+    // A source may write a fraction its own clock did not establish.
+    const iv = timestampInterval("2019-07-15T09:12:00.900Z", TimePrecision.Second)!;
+    expect(iv.start).toBe(Date.UTC(2019, 6, 15, 9, 12, 0, 0));
+    expect(iv.end - iv.start).toBe(1000);
+  });
+
+  it("reads a fraction in the source's own zone", () => {
+    const iv = timestampInterval("2019-07-15T09:12:00.250+05:00")!;
+    expect(iv.start).toBe(Date.UTC(2019, 6, 15, 4, 12, 0, 250));
+  });
+
+  it("renders the milliseconds it kept", () => {
+    expect(formatTimestamp("2019-07-15T09:12:00.100Z", undefined, "en-GB")).toContain(".100");
+  });
+
+  it("floors and steps by whole milliseconds", () => {
+    const at = Date.UTC(2019, 6, 15, 9, 12, 0, 137);
+    expect(floorToUnit(at, UnitOfTime.Millisecond, 1)).toBe(at);
+    expect(floorToUnit(at, UnitOfTime.Millisecond, 50)).toBe(Date.UTC(2019, 6, 15, 9, 12, 0, 100));
+    expect(addUnits(at, UnitOfTime.Millisecond, 1)).toBe(Date.UTC(2019, 6, 15, 9, 12, 0, 138));
+    expect(addUnits(Date.UTC(2019, 6, 15, 9, 12, 59, 999), UnitOfTime.Millisecond, 1)).toBe(
+      Date.UTC(2019, 6, 15, 9, 13, 0, 0),
+    );
   });
 });

@@ -31,6 +31,7 @@ export const LineVariantSchema = z.enum(LineVariant);
  * sites like `UnitOfTime.Year` read exactly as they did before.
  */
 export const UnitOfTime = {
+  Millisecond: "millisecond",
   Second: "second",
   Minute: "minute",
   Hour: "hour",
@@ -59,6 +60,13 @@ export const UnitOfTimeSchema = z.enum(UnitOfTime);
  * "to the week" in the way it can be known to the month. `week` remains a
  * perfectly good AXIS TICK granularity though, which is why `floorToUnit` takes
  * a `UnitOfTime` while a precision cannot be one.
+ *
+ * The scale bottoms out at `millisecond` because machine-generated evidence is
+ * evidence: server logs, audit trails and transaction records routinely
+ * establish a time to the millisecond, and with those sources the ORDER is
+ * frequently the whole argument — which write landed first, whether the
+ * transfer preceded the instruction. Stopping at `second` did not make the
+ * contract more careful, it just discarded that ordering silently.
  */
 export const TimePrecision = {
   Year: "year",
@@ -67,6 +75,7 @@ export const TimePrecision = {
   Hour: "hour",
   Minute: "minute",
   Second: "second",
+  Millisecond: "millisecond",
 } as const;
 export type TimePrecision = (typeof TimePrecision)[keyof typeof TimePrecision];
 export const TimePrecisionSchema = z.enum(TimePrecision);
@@ -84,6 +93,18 @@ export function hasTimeOfDay(timestamp: string): boolean {
 }
 
 /**
+ * True when `timestamp` actually writes out a fraction of a second.
+ *
+ * `09:12:00` and `09:12:00.000` are the same instant but not the same claim:
+ * only the second says the source resolved the millisecond. Millisecond
+ * precision needs this rather than `hasTimeOfDay`, for the same reason minute
+ * precision needs a time of day at all.
+ */
+export function hasFractionalSeconds(timestamp: string): boolean {
+  return /\d{2}:\d{2}:\d{2}\.\d+/.test(timestamp);
+}
+
+/**
  * Whether a timestamp string can actually support the claimed precision.
  *
  * A date-only string cannot be known to the minute — claiming otherwise is
@@ -93,6 +114,7 @@ export function timestampSupportsPrecision(
   timestamp: string,
   precision: TimePrecision,
 ): boolean {
+  if (precision === TimePrecision.Millisecond) return hasFractionalSeconds(timestamp);
   if (!SUB_DAY_PRECISIONS.includes(precision)) return true;
   return hasTimeOfDay(timestamp);
 }
@@ -110,6 +132,7 @@ export function resolveTimePrecision(
   precision?: TimePrecision,
 ): TimePrecision {
   if (precision) return precision;
+  if (hasFractionalSeconds(timestamp)) return TimePrecision.Millisecond;
   return hasTimeOfDay(timestamp) ? TimePrecision.Second : TimePrecision.Day;
 }
 
@@ -142,7 +165,20 @@ export interface TimeInterval {
  * `formatTimestamp` exists to prevent, arriving through the positioning layer.
  */
 const ISO_FIELDS =
-  /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?)?$/;
+  /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,9}))?)?(Z|[+-]\d{2}:?\d{2})?)?$/;
+
+/**
+ * A written fraction of a second, as whole milliseconds.
+ *
+ * Padded before truncating so `.1` is 100ms rather than 1ms, and anything finer
+ * than a millisecond is dropped — the contract resolves no further, and keeping
+ * digits it cannot position or display would be the same silent over-claim the
+ * precision scale exists to prevent.
+ */
+function millisecondsOf(fraction: string | undefined): number {
+  if (!fraction) return 0;
+  return Number(`${fraction}000`.slice(0, 3));
+}
 
 /**
  * Minutes to add to a source wall clock to reach UTC. Absent or `Z` means UTC.
@@ -152,7 +188,7 @@ const ISO_FIELDS =
  */
 export function offsetMinutesOf(timestamp: string): number {
   const m = ISO_FIELDS.exec(timestamp);
-  return m ? offsetMinutes(m[7]) : 0;
+  return m ? offsetMinutes(m[8]) : 0;
 }
 
 function offsetMinutes(token: string | undefined): number {
@@ -172,10 +208,11 @@ const FIELD_ORDER: readonly TimePrecision[] = [
   TimePrecision.Hour,
   TimePrecision.Minute,
   TimePrecision.Second,
+  TimePrecision.Millisecond,
 ];
 
 /** The value each field takes when it sits below the known precision. */
-const FIELD_FLOOR: readonly number[] = [0, 0, 1, 0, 0, 0];
+const FIELD_FLOOR: readonly number[] = [0, 0, 1, 0, 0, 0, 0];
 
 /**
  * Builds an epoch ms from UTC wall-clock fields, tolerating out-of-range values
@@ -190,7 +227,7 @@ const FIELD_FLOOR: readonly number[] = [0, 0, 1, 0, 0, 0];
 function utcFromFields(f: readonly number[]): number {
   const d = new Date(0);
   d.setUTCFullYear(f[0]!, f[1]!, f[2]!);
-  d.setUTCHours(f[3]!, f[4]!, f[5]!, 0);
+  d.setUTCHours(f[3]!, f[4]!, f[5]!, f[6] ?? 0);
   return d.getTime();
 }
 
@@ -204,6 +241,7 @@ function fieldsAt(at: number, offset: number): number[] {
     d.getUTCHours(),
     d.getUTCMinutes(),
     d.getUTCSeconds(),
+    d.getUTCMilliseconds(),
   ];
 }
 
@@ -238,6 +276,7 @@ export function timestampInterval(
     Number(m[4] ?? 0),
     Number(m[5] ?? 0),
     Number(m[6] ?? 0),
+    millisecondsOf(m[7]),
   ];
   // `Date.parse` is lenient about out-of-range calendar fields — V8 reads
   // "2019-02-30" as 2 March — but `TimestampSchema` rejects such a value, so a
@@ -255,7 +294,7 @@ export function timestampInterval(
   endFields[keep] = endFields[keep]! + 1; // utcFromFields normalises the rollover
 
   // A wall clock of 09:00 at +05:00 is the instant 04:00Z, i.e. wall - offset.
-  const shift = offsetMinutes(m[7]) * 60_000;
+  const shift = offsetMinutes(m[8]) * 60_000;
   return {
     start: utcFromFields(startFields) - shift,
     end: utcFromFields(endFields) - shift,
@@ -281,11 +320,11 @@ export function floorToUnit(
   offset = 0,
 ): number {
   const shift = offset * 60_000;
-  const [y, mo, d, h, mi, s] = fieldsAt(at, offset) as [
-    number, number, number, number, number, number,
+  const [y, mo, d, h, mi, s, ms] = fieldsAt(at, offset) as [
+    number, number, number, number, number, number, number,
   ];
   const build = (...f: number[]) =>
-    utcFromFields([f[0]!, f[1]!, f[2]!, f[3] ?? 0, f[4] ?? 0, f[5] ?? 0]) - shift;
+    utcFromFields([f[0]!, f[1]!, f[2]!, f[3] ?? 0, f[4] ?? 0, f[5] ?? 0, f[6] ?? 0]) - shift;
   const down = (v: number) => Math.floor(v / step) * step;
 
   switch (unit) {
@@ -306,6 +345,8 @@ export function floorToUnit(
       return build(y, mo, d, h, down(mi));
     case UnitOfTime.Second:
       return build(y, mo, d, h, mi, down(s));
+    case UnitOfTime.Millisecond:
+      return build(y, mo, d, h, mi, s, down(ms));
   }
 }
 
@@ -344,6 +385,9 @@ export function addUnits(
       break;
     case UnitOfTime.Second:
       f[5]! += step;
+      break;
+    case UnitOfTime.Millisecond:
+      f[6]! += step;
       break;
   }
   return utcFromFields(f) - shift;

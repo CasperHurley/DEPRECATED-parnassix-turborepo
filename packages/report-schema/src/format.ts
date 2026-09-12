@@ -34,6 +34,15 @@ export const PRECISION_FORMAT: Record<TimePrecision, Intl.DateTimeFormatOptions>
     minute: "2-digit",
     second: "2-digit",
   },
+  [TimePrecision.Millisecond]: {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit",
+    fractionalSecondDigits: 3,
+  },
 };
 
 /**
@@ -90,6 +99,7 @@ const PRECISION_RANK: Record<TimePrecision, number> = {
   [TimePrecision.Hour]: 3,
   [TimePrecision.Minute]: 4,
   [TimePrecision.Second]: 5,
+  [TimePrecision.Millisecond]: 6,
 };
 
 /**

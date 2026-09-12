@@ -195,6 +195,7 @@ const ZONE_MATERIAL_UNITS: readonly UnitOfTime[] = [
   UnitOfTime.Hour,
   UnitOfTime.Minute,
   UnitOfTime.Second,
+  UnitOfTime.Millisecond,
 ];
 
 /* -------------------------------------------------------------------------- */
@@ -217,6 +218,16 @@ const MAX_TICKS = 12;
  * and a 28-day month both tick on the 1st regardless of what this table says.
  */
 const TICK_LADDER: readonly { unit: UnitOfTime; step: number; nominal: number }[] = [
+  // Sub-second rungs exist because machine logs do. Without them a cluster of
+  // log lines inside one second snaps out to a one-second domain and loses the
+  // ordering it was carried here to show.
+  { unit: UnitOfTime.Millisecond, step: 1, nominal: 1 },
+  { unit: UnitOfTime.Millisecond, step: 10, nominal: 10 },
+  { unit: UnitOfTime.Millisecond, step: 25, nominal: 25 },
+  { unit: UnitOfTime.Millisecond, step: 50, nominal: 50 },
+  { unit: UnitOfTime.Millisecond, step: 100, nominal: 100 },
+  { unit: UnitOfTime.Millisecond, step: 250, nominal: 250 },
+  { unit: UnitOfTime.Millisecond, step: 500, nominal: 500 },
   { unit: UnitOfTime.Second, step: 1, nominal: 1_000 },
   { unit: UnitOfTime.Second, step: 5, nominal: 5_000 },
   { unit: UnitOfTime.Second, step: 15, nominal: 15_000 },
@@ -258,6 +269,10 @@ export function deriveTickUnit(
   span: number,
   targetTicks: number = TARGET_TICKS,
 ): { unit: UnitOfTime; step: number } {
+  // Below one millisecond there is nothing left to resolve: the contract stops
+  // there, so an axis cannot usefully tick finer than its finest fact.
+  if (span <= 0) return { unit: UnitOfTime.Millisecond, step: 1 };
+
   let best: { unit: UnitOfTime; step: number } | null = null;
   let bestDistance = Infinity;
 
@@ -293,6 +308,7 @@ export function deriveTickUnit(
  * `AXIS_TICK_FORMAT` instead.
  */
 export const TimeFormatterMap: Record<UnitOfTime, Intl.DateTimeFormatOptions> = {
+  millisecond: { second: "numeric", fractionalSecondDigits: 3 },
   second: { second: "numeric" },
   minute: { minute: "numeric", second: "numeric" },
   hour: { hour: "numeric", minute: "2-digit" },
@@ -305,6 +321,7 @@ export const TimeFormatterMap: Record<UnitOfTime, Intl.DateTimeFormatOptions> = 
 /** What a tick says on its own. */
 export const AXIS_TICK_FORMAT: Record<UnitOfTime, Intl.DateTimeFormatOptions> = {
   year: { year: "numeric" },
+  millisecond: { second: "2-digit", fractionalSecondDigits: 3, hour12: false },
   month: { month: "short" },
   week: { month: "short", day: "numeric" },
   day: { month: "short", day: "numeric" },
@@ -318,6 +335,7 @@ export const AXIS_TICK_FORMAT: Record<UnitOfTime, Intl.DateTimeFormatOptions> = 
  * month-ticked axis spanning two years can say which year a mark belongs to.
  */
 const TICK_CONTEXT: Partial<Record<UnitOfTime, Intl.DateTimeFormatOptions>> = {
+  millisecond: { hour: "numeric", minute: "2-digit", hour12: false },
   month: { year: "numeric" },
   week: { year: "numeric" },
   day: { year: "numeric" },

@@ -1,4 +1,4 @@
-# Aneural Frontend
+# Aneural
 
 A cross-platform monorepo: one shared Tamagui component layer rendered by a web app, a native iOS/Android app, and an Electron desktop app, with a NestJS API alongside them.
 

@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Text, YStack } from "tamagui";
+import { Text } from "tamagui";
 import {
   formatTimestamp,
   labelPrecision,
@@ -53,33 +53,49 @@ export function formatEventPeriods(
   labelUnit?: UnitOfTime,
   locale?: string,
 ): string {
-  const one = (span: {
+  return [event, ...(event.spans ?? [])]
+    .map((span) => formatPeriod(span, labelUnit, locale))
+    .join(PERIOD_SEPARATOR);
+}
+
+/** One period of a fact, written out. */
+export function formatPeriod(
+  span: {
     timestamp: string;
     precision?: TimelineEventSpec["precision"];
     until?: string;
     untilPrecision?: TimelineEventSpec["precision"];
-  }) => {
-    const from = formatTimestamp(
-      span.timestamp,
-      labelPrecision(span.timestamp, span.precision, labelUnit),
-      locale,
-    );
-    if (!span.until) return from;
-    const to = formatTimestamp(
-      span.until,
-      labelPrecision(span.until, span.untilPrecision, labelUnit),
-      locale,
-    );
-    return `${from}${RANGE_SEPARATOR}${to}`;
-  };
-
-  return [event, ...(event.spans ?? [])].map(one).join(PERIOD_SEPARATOR);
+  },
+  labelUnit?: UnitOfTime,
+  locale?: string,
+): string {
+  const from = formatTimestamp(
+    span.timestamp,
+    labelPrecision(span.timestamp, span.precision, labelUnit),
+    locale,
+  );
+  if (!span.until) return from;
+  const to = formatTimestamp(
+    span.until,
+    labelPrecision(span.until, span.untilPrecision, labelUnit),
+    locale,
+  );
+  return `${from}${RANGE_SEPARATOR}${to}`;
 }
 
 export interface EventCardBodyProps {
   event: TimelineEventSpec;
   index: number;
   labelUnit?: UnitOfTime;
+  /**
+   * Drop the line caps.
+   *
+   * The card box clips because its extent has to be known before it is drawn.
+   * Somewhere that constraint does not apply — a panel that sizes to its own
+   * content — the same body can say the whole of what it knows, and a title cut
+   * short on the axis is readable in full.
+   */
+  expanded?: boolean;
   renderEvent?: (event: TimelineEventSpec, index: number) => React.ReactNode;
   renderOppositeContent?: (event: TimelineEventSpec, index: number) => React.ReactNode;
 }
@@ -89,20 +105,22 @@ export function EventCardBody({
   event,
   index,
   labelUnit,
+  expanded,
   renderEvent,
   renderOppositeContent,
 }: EventCardBodyProps) {
   if (renderEvent) return <>{renderEvent(event, index)}</>;
+  const lines = expanded ? undefined : 2;
   return (
     <>
-      <Text fontSize="$1" o={0.6} numberOfLines={2}>
+      <Text fontSize="$1" o={0.6} numberOfLines={lines}>
         {formatEventPeriods(event, labelUnit)}
       </Text>
-      <Text fontWeight="600" fontSize="$2" numberOfLines={2}>
+      <Text fontWeight="600" fontSize="$2" numberOfLines={lines}>
         {event.title}
       </Text>
       {event.subtitle ? (
-        <Text fontSize="$1" o={0.8} numberOfLines={2}>
+        <Text fontSize="$1" o={0.8} numberOfLines={lines}>
           {event.subtitle}
         </Text>
       ) : null}

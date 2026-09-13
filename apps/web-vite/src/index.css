@@ -14,10 +14,11 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* min-height, not height: a report is a document and must be free to grow. */
 html,
 body,
 #root {
-  height: 100%;
+  min-height: 100%;
 }
 
 body {

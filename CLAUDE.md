@@ -79,7 +79,7 @@ Validation runs in three places for three reasons: Python validates its agents' 
 boundary per component, keyed by `id`. A user mid-walkthrough loses one panel, not the
 whole document.
 
-### Provenance is per-fact, first-class — [built: type only; shape provisional]
+### Provenance is per-fact, first-class — [built: type + on-screen rendering; shape provisional]
 
 Citation granularity is per *fact* (a timeline event, a table cell), not per component. A
 `SourceRef` belongs both on base `ComponentProps` and on individual data points.
@@ -99,7 +99,20 @@ Citations must degrade for print: interactive highlight-in-the-PDF on screen, nu
 footnote markers plus a reference table on export. Same data, two presentations.
 **Hover-only citation is not acceptable** — it doesn't survive the export path.
 
-### Render context in the type system — [built: type + context; nothing lays out from it yet]
+The Timeline's `DetailPanel` is the first half of that pair, and only the screen half: document
+id, page, quoted text, and how many highlight regions a ref carries. The regions are not drawn
+yet — that needs the page image plus `pageSize.height` to flip a BOTTOMLEFT box into the
+renderer's TOPLEFT space. **The print half — footnote markers and a reference table — is not
+built**, and until it is, no card or table renders a citation at all; the panel adds provenance
+on screen without removing any from export, because there was none there to remove.
+
+**Gaps are rendered, not omitted.** `periodSourcesOf` pairs every period of a fact with its own
+source *including the periods nothing backs*, and an unbacked one prints "No source recorded"
+where the citation would have been. A fact claiming three periods and backed by two ledger
+pages must not be able to read as fully sourced — listing only the citations that exist is
+precisely how it would. Pinned by a test.
+
+### Render context in the type system — [built]
 
 Both scales deliberately sidestep this, and it turned out measurement was never the answer.
 They position everything as a *percentage* of the axis, and the renderer NAMES the axis's
@@ -117,6 +130,195 @@ No component owns its own dimensions. Every component receives a render context 
 approximately `{ medium: 'screen' | 'print' | 'slide', width, height }` — and lays out from
 the box it's given. The same report must render to a phone, a slide, letter paper, and a
 poster board, filling the space dynamically. Agent-emitted templates stay size-agnostic.
+
+**`ReportCanvas` measures its own box and provides it**, rather than components reading the
+viewport. The box a report is rendered into is not the window — a report in a sidebar is
+narrow on a 4K monitor — so a media query would tell every component the wrong thing. An
+ancestor that *states* a box always wins over the measurement: letter paper is 8.5in across
+whatever a browser reports, and export has to be deterministic from the stated width alone.
+
+The first thing to lay out from it is **`Timeline`'s axis**. `resolveTimelineOrientation`
+narrows a specified `horizontal` to `vertical` when the box is under `3 * CARD_WIDTH` —
+derived from the card, not a device breakpoint, because the thing that actually fails is a
+horizontal axis showing about one card at a time, where every comparison between two events
+costs a sideways scroll. Vertical spends the page's OWN scroll on time instead, which is the
+direction a phone has to give.
+
+It is deliberately one-directional: a specified `vertical` is never widened back. Fitting a
+horizontal axis into a narrow box is a decision only the renderer can make, because only the
+renderer knows the box — but a vertical axis already fits every box, so overriding one would
+be the renderer second-guessing the agent for nothing. An unmeasured box (width 0) keeps the
+spec rather than guessing for one frame and flipping on the next.
+
+The win is uneven across the two scales, and the reason is structural. **Ordinal has no
+lanes**, so a vertical ordinal timeline is exactly one card wide and fits a 390px phone with
+nothing off-screen — it is the right mobile layout, permanently. The **time scale always
+needs a cross-axis** for lanes, and vertical puts that cross-axis on X, the scarce direction
+on a phone: the fixture's five-event cluster forces seven lanes and ~1422px across. Axis
+length cannot fix that — lane count is floored by the biggest cluster, not by the span
+(measured: `minSeparation` 0.143 → 7 lanes, 0.02 → 5 lanes, cluster size 5 throughout).
+That is answered by the **frozen rail** below rather than by moving the cards.
+
+#### The frozen rail, on a vertical axis — [built]
+
+A vertical timeline stacks its lanes along X, so panning through a dense cluster used to
+carry the axis and its tick labels off the left edge, leaving a column of cards with no
+visible time reference. The axis therefore comes OUT of the scrolling area: in vertical
+orientation the component is a fixed column beside a horizontally scrolling lane area, and
+the lane area measures its cross-axis from the column's right edge (`axisEdge`, `laneOrigin`).
+Horizontal is untouched and renders pixel-for-pixel as before — there, panning moves you
+through TIME, which is the thing the axis is a ruler for, so axis and cards belong together.
+
+The column carries **one node per group**, not per event, listing member titles in
+chronological order. Per group because a group is already one branch point: five calls in an
+afternoon share a mark, and five rail entries at that position would have to lie about where
+four of them are. It is the existing trunk grouping that makes this fit at all — the fixture's
+ten events are six groups, and its five-event cluster is one of them.
+
+A node carries no date of its own: the tick labels immediately to its left already state the
+time, and a group spanning three days has no single date to print that would not be wrong for
+four of its five members.
+
+**Nothing collapses and nothing is hidden.** The rail always lists every event; what varies is
+where the DETAIL goes, which `resolveTimelineDetail` decides:
+
+- `cards` — every event drawn beside the axis. What the horizontal scale always does.
+- `panel` — the rail alone, opening an event's detail when a node is pressed. Taken when the
+  box is too narrow to hold a card next to the rail, where `cards` could only be reached by
+  scrolling sideways through them.
+
+On a phone this is the difference between a component that scrolls in two directions and one
+that fits: the rail then spends the whole width on titles, so nothing truncates, and the page
+has no horizontal scroll anywhere. Pressing any node opens the whole GROUP with that event
+marked — pressing the third of five calls in an afternoon and being shown only that call would
+hide the very thing the grouping exists to say.
+
+`DetailPanel` is a **drawer, not a popup**, because of what it has to hold. The event's own
+detail is the small part; the substance is its PROVENANCE — document, page, quoted line, and
+eventually the page image with the region highlighted. That is a reading surface, so it opens
+against the axis and runs to the far edge, leaving the ruler and tick labels visible the whole
+time: reading a citation while unable to see WHEN the thing happened would throw away the
+reason the axis was frozen. Its height is named rather than inherited, for the same reason the
+axis names its length — a vertical timeline is taller than a phone, so a drawer filling it
+could not be seen at once.
+
+**A static medium never gets `panel`, however narrow the page.** A panel that opens on a press
+is exactly the interaction this file rules out as the ONLY route to a fact — the rule that
+rejected hover-only citation and expandable clustering — and paper cannot be pressed. On export
+every card is drawn. This is the first thing to depend on `useIsStaticMedium`, and it is the
+reason that hook exists. Pinned by a test over letter-width pages.
+
+That distinction is the whole of why this is allowed and expandable clustering was not: there,
+the collapsed state was the only state, and a fact lived behind an interaction. Here the rail
+is complete before anything is pressed, and the press only enlarges what it already says.
+
+The open selection is held as an id and resolved by LOOKUP each render, not kept as an
+object: a report is a session document whose components are replaced by id as the backend
+regenerates them, and a held reference would keep a panel open on evidence no longer in the
+report.
+
+`stackRailNodes` nudges an entry clear when the one above would run into it — the same
+collision problem lane packing solves, in text height rather than card height, so it is much
+rarer and a nudge suffices instead of a new lane. Greedy over a sorted copy with ties broken
+by original index, like `packGroupLanes`, so it is reproducible byte-for-byte. **Only the text
+moves**; the mark on the axis stays where the evidence puts it, so a nudge never makes a claim
+about when something happened.
+
+#### The lit chain — [built]
+
+A card, the leader that carries it back to the axis, and the band that leader lands on are
+**one claim drawn in three places**. In a dense cluster that is genuinely hard to read: six
+leaders converge on one trunk, and nothing on screen says which of them belongs to the card
+being read. Hovering or pressing a card lights all three together and fades everything else.
+
+**A marker may be dimmed but never brightened; a connector may be either.** The split is the
+whole design. A marker's opacity is EVIDENCE — `PRECISION_EMPHASIS` says how much the source
+knew — so raising a lit band to full strength would overwrite that with a hover state, making
+a window the source only guessed at read as a time it fixed. Every tier in `HIGHLIGHT_WEIGHT`
+is therefore a fraction ≤ 1 and a lit band sits at exactly the strength its precision earned.
+A connector asserts nothing — it is a routing device — so its own strength is free to carry
+the emphasis the marker cannot, and a lit leader goes to full opacity in the MARKER's colour:
+the leader's whole job is to say this card belongs to that band, so drawing it in the band's
+colour is the shortest way to say it. The card's border takes the same colour, and the three
+read as one object.
+
+**Known limit: opacity is carrying two things at once**, and the bands are only comparable
+WITHIN a tier. A `related` year-precision band (0.3 × 0.6) is fainter than an `aside`
+minute-precision one (1 × 0.3), so the precision ordering inverts across a tier boundary. That
+is inherent to spending one channel on both, and it is bounded in the way that matters: the
+tier is transient pointer state that paper never has, so the exported artifact always carries
+precision alone. Widening the scale would not fix it and would cost the thing the fade is
+for.
+
+At rest, with nothing lit, the component draws exactly what it drew before this existed —
+verified pixel-identical at desktop width with the feature stashed out and rebuilt.
+
+What lights is decided by **whose claim each part is**, and the answer is a stretch of a line
+rather than a whole one. **The lit path is the route and no more.** The arms and the branch are
+one event's outright: an arm lands where one period of one fact was recorded, and lighting a
+sibling's alongside would say the lit card was placed there too. The trunk and the rail are the
+GROUP's — a routing device several cards share — but only the part a lit card actually travels
+belongs to it. A trunk lit past the card it points at is pointing at the WRONG card, which is
+what it did: one element from the rail to the group's deepest lane, lit end to end for any
+member, so hovering the fourth of five cards drew a bright line straight past it to the fifth.
+It now stops where that card's own branch turns off, and the rail lights only from that event's
+mark across to the trunk.
+
+The lit rail stretch is a **route, not an extent**. The rail's own job is to say a group owns
+the span its events fall in; a sub-stretch of it lit for one member would, read the same way,
+claim that member owns arm-to-midpoint, which no source said. It is the piece of rail the
+card's route travels along, which is exactly why `litRailSpan` takes the trunk's foot as well
+as the arms — without it the blue chain has a gap between the arm and the trunk, and "a lit
+card's route back to the axis is unbroken" stops being true.
+
+A group's `arms` are deduped across its members and so cannot say which are whose, which is why
+`armsOf` is its own export — the rule stated once, asked twice, rather than restated in the
+renderer where the two copies would drift. Pinned by a test asserting a group's arms are exactly
+the union of its members'.
+
+Those lines are **split, not overlaid**. A bright element drawn on top of a dim one is not the
+same colour as the bright one alone, and — because a browser fits a dashed border's period to
+the length of the side it is on — a shorter overlay drifts out of phase with the base beneath
+it, showing grey dashes through the blue one's gaps. `splitLitRun` serves both the rail (in
+fractions) and the trunk (in cross-axis pixels), and its pieces always tile the original run
+exactly, so a highlight can never make a leader longer or shorter than the one the layout drew.
+At rest it returns exactly one piece, which is what keeps the resting render byte-identical.
+The cost is the same dash-fitting rule pointing the other way: in a multi-member group drawn
+dashed, the unlit remainder re-fits its rhythm while a member is lit. No element moves or
+resizes — the rule that matters, since lane packing is arithmetic done before any of this and a
+card that grew on hover would overprint the neighbour the packing had cleared it of — but the
+dashes in the faded part are not in the same places. A lone event never splits at all: its rail
+and trunk are wholly its own and light end to end.
+
+Everything else in the lit event's own group takes a **middle tier** rather than the far fade.
+Two tiers were not enough: a sibling three milliseconds away faded exactly as hard as an event
+eight months away, and a cluster exists precisely to say those things happened at the same
+moment. `related` is still a FADE — 0.6 against `aside`'s 0.3 — so the dim-never-brighten rule
+is untouched; it is a smaller fade, not an increase. Connectors need no new value for it, since
+a connector's resting 0.5 already IS the middle: a cluster holding the lit event keeps the
+structure it draws at rest, and only the route through it brightens.
+
+The frozen rail's nodes (`AxisNode`) deliberately stay on a single emphasis. The rail is already
+a compact list of every event in order, and a third weight on eighteen-pixel rows would be noise
+rather than information — and in `railOnly` mode there are no cards to hover in the first place.
+
+`highlighted` is resolved by LOOKUP against the placed events, like the drawer's `selection` and
+for the same reason: a pin naming an event that has since left the spec — or become undated,
+which places it nowhere — would otherwise fade every remaining event against a card that is not
+on screen.
+
+**A hover is transient; a press pins.** Two sources, kept separate and composed as
+`hover ?? pinned`, because a pointer and a finger are not the same gesture: a pin survives
+reading the card, hovering a second card lights that one and hands the highlight back when the
+pointer leaves, and touch — which has no hover at all — reaches the same affordance by
+tapping. A tap emits a compatibility hover first, so a press always drops its own card's
+hover; otherwise the press that puts a card out would leave it lit.
+
+It is allowed under the rule that rejected hover-only citation for the same reason the drawer
+is: **nothing lives behind it.** Every part of the chain is already drawn, the fade is
+transient, and `useIsStaticMedium` withholds the state entirely on paper — an export that
+inherited whatever a screen happened to be pointing at would print one event emphasised over
+the rest for no reason a reader could see.
 
 ### Platform divergence via file extensions — [decided, not built]
 
@@ -453,7 +655,9 @@ The wire contract exists and is enforced; the rendering is still scaffolding.
 - `packages/ui/src/ReportCanvas/fixtures.ts` — `mockReport`, the data formerly inlined in
   Timeline's `useState`. The three apps pass it explicitly.
 - `packages/ui/src/render-context.tsx` — `RenderContextProvider` / `useRenderContext` /
-  `useIsStaticMedium`. Defined, not yet consumed by any layout.
+  `useIsStaticMedium`. `ReportCanvas` measures its own box and provides it (an ancestor's
+  stated width wins); `Timeline` resolves its orientation from it via
+  `resolveTimelineOrientation` in the Timeline's `types.ts`.
 
 Known gaps:
 

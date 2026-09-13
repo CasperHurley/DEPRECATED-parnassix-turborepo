@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { TimePrecision, UnitOfTime } from "@repo/report-schema";
 import { formatEventPeriods } from "../src/ReportCanvas/Components/Timeline/card";
+import { periodSourcesOf } from "../src/ReportCanvas/Components/Timeline/DetailPanel";
 
 /**
  * The card's date line is the only place an event's periods are stated in
@@ -81,3 +82,48 @@ describe("a card states every period, and never more than is known", () => {
     expect(formatEventPeriods({ timestamp: "not-a-date" }, undefined, "en-US")).toBe("not-a-date");
   });
 });
+
+/**
+ * A citation list is only trustworthy if its GAPS are visible. A fact claiming
+ * three periods, backed by two documents, must not be able to render as fully
+ * sourced — that is the exact shape of the failure this repo is built against.
+ */
+describe("every period is accounted for, sourced or not", () => {
+  it("pairs each period with its own source", () => {
+    const pairs = periodSourcesOf(
+      {
+        id: "e",
+        title: "Instalments paid",
+        timestamp: "2019-02-01",
+        precision: TimePrecision.Month,
+        spans: [
+          { timestamp: "2019-05-01", precision: TimePrecision.Month, source: ref("q2") },
+          { timestamp: "2019-09-01", precision: TimePrecision.Month },
+        ],
+        source: ref("q1"),
+      } as never,
+      undefined,
+      "en-US",
+    );
+    expect(pairs.map((p) => [p.period, p.source?.documentId])).toEqual([
+      ["Feb 2019", "q1"],
+      ["May 2019", "q2"],
+      ["Sep 2019", undefined],
+    ]);
+  });
+
+  it("keeps an unsourced period in the list rather than dropping it", () => {
+    // Filtering the gap out is what would let two citations read as three.
+    const pairs = periodSourcesOf(
+      { id: "e", title: "t", timestamp: "2019-02-01", spans: [] } as never,
+      undefined,
+      "en-US",
+    );
+    expect(pairs).toHaveLength(1);
+    expect(pairs[0]!.source).toBeUndefined();
+  });
+});
+
+function ref(documentId: string) {
+  return { documentId, nodeId: "n", page: 1, bbox: [], coordOrigin: "bottomleft" as const };
+}

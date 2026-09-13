@@ -1,17 +1,20 @@
 import * as React from "react";
-import { Section, H1 } from "tamagui";
+import { Section, H1, YStack } from "tamagui";
 import {
   ComponentSpecSchema,
   z,
   type ComponentKind,
   type ComponentSpecInput,
 } from "@repo/report-schema";
+import { RenderContextProvider, useRenderContext } from "../render-context";
 import { Timeline } from "./Components/Timeline/Timeline";
 import { ComponentErrorBoundary } from "./ComponentErrorBoundary";
 import { ComponentErrorCard } from "./ComponentErrorCard";
 import { ReportCanvasProps } from "../types";
 
 export function ReportCanvas({ report }: ReportCanvasProps) {
+  const { context, onLayout } = useCanvasBox();
+
   return (
     /*
      * The canvas fills the box it is given rather than shrinking to its
@@ -21,17 +24,64 @@ export function ReportCanvas({ report }: ReportCanvasProps) {
      * be proportional across.
      */
     <Section alignSelf="stretch" width="100%" px="$4">
-      <H1>Report Canvas</H1>
-      {report.components.map((component, index) => (
-        <ComponentErrorBoundary
-          key={component?.id ?? index}
-          componentId={component?.id ?? `#${index}`}
-        >
-          <ReportComponent spec={component} />
-        </ComponentErrorBoundary>
-      ))}
+      {/*
+       * Measured INSIDE the padding, because the context has to describe the
+       * box a component actually gets. Measuring the padded frame reports ~36px
+       * that no component can lay out in, which is enough to put a layout on the
+       * wrong side of a threshold derived from a card's width.
+       */}
+      <YStack alignSelf="stretch" onLayout={onLayout}>
+        <RenderContextProvider value={context}>
+          <H1>Report Canvas</H1>
+          {report.components.map((component, index) => (
+            <ComponentErrorBoundary
+              key={component?.id ?? index}
+              componentId={component?.id ?? `#${index}`}
+            >
+              <ReportComponent spec={component} />
+            </ComponentErrorBoundary>
+          ))}
+        </RenderContextProvider>
+      </YStack>
     </Section>
   );
+}
+
+/** What a layout callback reports, typed structurally so this file does not
+ * import react-native — an optional peer dependency here. */
+type LayoutEvent = { nativeEvent: { layout: { width: number; height: number } } };
+
+/**
+ * The canvas's own box, measured once and handed to every component below.
+ *
+ * Measured HERE rather than read from the viewport, because the box a report is
+ * rendered into is not the window: a report in a sidebar is narrow on a 4K
+ * monitor, and a media query would tell every component the wrong thing.
+ *
+ * An ancestor that STATES its box always wins. The print and slide paths set a
+ * width that has nothing to do with what a browser measures — letter paper is
+ * 8.5in across whatever the window is — so a measurement must never silently
+ * replace one. That also keeps export deterministic: the same stated width
+ * yields the same layout on any machine.
+ */
+function useCanvasBox() {
+  const inherited = useRenderContext();
+  const stated = inherited.width > 0;
+  const [measured, setMeasured] = React.useState({ width: 0, height: 0 });
+
+  const handleLayout = React.useCallback(({ nativeEvent }: LayoutEvent) => {
+    const { width, height } = nativeEvent.layout;
+    setMeasured((prev) =>
+      prev.width === width && prev.height === height ? prev : { width, height },
+    );
+  }, []);
+
+  const context = React.useMemo(
+    () => (stated ? inherited : { ...inherited, ...measured }),
+    [stated, inherited, measured],
+  );
+
+  return { context, onLayout: stated ? undefined : handleLayout };
 }
 
 /**

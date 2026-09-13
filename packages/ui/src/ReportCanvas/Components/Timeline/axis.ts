@@ -589,6 +589,91 @@ export const pct = (fraction: number): string =>
 /* -------------------------------------------------------------------------- */
 
 /**
+ * Where one event's arms rise to the axis.
+ *
+ * Two marks when a period is wide enough to have a visible start and an end,
+ * one when it is a point. Either way they land on the axis where the evidence
+ * does, not where the trunk happens to be.
+ *
+ * Exported because a group's `arms` are DEDUPED across its members and so
+ * cannot be attributed back to one of them — two events at the same instant
+ * share an arm. Anything asking which arms belong to a given event has to ask
+ * this rule rather than the group, and stating the rule twice is how the two
+ * answers drift.
+ */
+export function armsOf(member: Pick<PlacedEvent, "spans">): number[] {
+  return member.spans.flatMap((span) =>
+    span.extentFraction >= MIN_VISIBLE_EXTENT
+      ? [span.startFraction, span.endFraction]
+      : [span.centerFraction],
+  );
+}
+
+/**
+ * The stretch of rail between one event's own marks and its group's trunk.
+ *
+ * A group's rail spans every member; this is the part of it one member actually
+ * uses to reach the trunk. Highlighting the whole rail for one card says the
+ * group's entire span belongs to that card, which in a cluster is four other
+ * facts' worth of axis it has no claim on.
+ *
+ * The trunk is included in the hull deliberately: the route has to REACH the
+ * trunk, so a mark sitting left of it spans mark -> trunk and one sitting right
+ * spans trunk -> mark. A single wide event, whose arms straddle its own centre,
+ * gets its whole rail back.
+ */
+export function litRailSpan(
+  arms: readonly number[],
+  centerFraction: number,
+): { start: number; size: number } {
+  const points = [...arms, centerFraction];
+  const start = Math.min(...points);
+  return { start, size: Math.max(...points) - start };
+}
+
+/** One stretch of a line, and whether it is part of the lit route. */
+export interface RunSegment {
+  start: number;
+  size: number;
+  lit: boolean;
+}
+
+/**
+ * One run broken into its lit stretch and whatever is left either side.
+ *
+ * Splitting rather than drawing a bright line ON TOP of a dim one: an overlay
+ * starting at a different origin starts its dash pattern at a different phase,
+ * so a dashed group would show the dim dashes through the lit one's gaps, and a
+ * full-strength colour composited over a half-strength one is not the colour
+ * drawn alone.
+ *
+ * Serves both the rail, whose run is in fractions of the axis, and the trunk,
+ * whose run is in cross-axis pixels. Same arithmetic; two copies of it would
+ * drift and the half that drifted would be the half no test covered.
+ *
+ * The pieces always tile the ORIGINAL run exactly — nothing is added and
+ * nothing is lost, so a highlight can never make a leader longer or shorter
+ * than the one the layout drew.
+ */
+export function splitLitRun(
+  start: number,
+  size: number,
+  lit: { start: number; size: number } | null,
+): RunSegment[] {
+  const end = start + size;
+  if (lit === null) return [{ start, size, lit: false }];
+
+  const litStart = Math.min(Math.max(lit.start, start), end);
+  const litEnd = Math.min(Math.max(lit.start + lit.size, litStart), end);
+
+  return [
+    { start, size: litStart - start, lit: false },
+    { start: litStart, size: litEnd - litStart, lit: true },
+    { start: litEnd, size: end - litEnd, lit: false },
+  ].filter((segment) => segment.size > 0);
+}
+
+/**
  * Gathers events into shared branch points.
  *
  * Two events join the same trunk when they fall on the same calendar day in the
@@ -614,16 +699,7 @@ export function groupTimelineEvents(
   const build = (members: PlacedEvent[]): PlacedGroup => {
     const startFraction = Math.min(...members.map((m) => m.startFraction));
     const endFraction = Math.max(...members.map((m) => m.endFraction));
-    const arms: number[] = [];
-    for (const member of members) {
-      for (const span of member.spans) {
-        // Two marks when the period is wide enough to have a visible start and
-        // end; one when it is a point. Either way the marks land on the axis
-        // where the evidence does, not where the trunk happens to be.
-        if (span.extentFraction >= MIN_VISIBLE_EXTENT) arms.push(span.startFraction, span.endFraction);
-        else arms.push(span.centerFraction);
-      }
-    }
+    const arms = members.flatMap(armsOf);
     return {
       id: members[0]!.event.id,
       members,
@@ -765,4 +841,38 @@ export function computeTimelineLayout(
       ? formatOffset(domain.offsetMinutes)
       : null,
   };
+}
+
+/**
+ * Stacks a vertical timeline's rail entries so none overprints its neighbour.
+ *
+ * The rail lists every group beside the axis, and in a dense cluster their
+ * entries want the same few pixels — the same collision lane packing solves for
+ * cards, but in text-height rather than card-height, so it is much rarer and the
+ * answer is a nudge rather than a new lane.
+ *
+ * An entry sits at its own position unless the one above would run into it, in
+ * which case it is pushed just clear. Only the TEXT moves: the mark on the axis
+ * stays exactly where the evidence puts it, so nothing here makes a claim about
+ * when something happened. A pushed entry still reads in chronological order,
+ * which is the convention a cluster's cards already follow.
+ *
+ * Greedy over a sorted copy, like `packGroupLanes`, so it is reproducible
+ * byte-for-byte and an exported PDF matches the screen.
+ */
+export function stackRailNodes<T>(
+  entries: readonly { item: T; screenY: number; height: number }[],
+  gap: number,
+): { item: T; top: number }[] {
+  let cursor = -Infinity;
+  return entries
+    .map((entry, index) => ({ entry, index }))
+    // Ties broken by original index so the order is total, never the sort's
+    // own stability — two groups at one instant must not swap between runs.
+    .sort((a, b) => a.entry.screenY - b.entry.screenY || a.index - b.index)
+    .map(({ entry }) => {
+      const top = Math.max(entry.screenY, cursor);
+      cursor = top + entry.height + gap;
+      return { item: entry.item, top };
+    });
 }

@@ -9,12 +9,16 @@ import {
 import {
   AXIS_PLACEMENT,
   MIN_SEPARATION,
-  packGroupLanes,
   axisOffsetMinutes,
   computeTimelineLayout,
   deriveTickUnit,
   formatOffset,
+  armsOf,
+  litRailSpan,
+  packGroupLanes,
   pct,
+  splitLitRun,
+  stackRailNodes,
 } from "../src/ReportCanvas/Components/Timeline/axis";
 
 const event = (
@@ -685,5 +689,183 @@ describe("an axis can resolve a machine-log window", () => {
       at("b", "2021-01-01T00:00:00Z"),
     ]);
     expect(layout.domain!.unit).toBe(UnitOfTime.Year);
+  });
+});
+
+/**
+ * The frozen rail on a vertical timeline lists every group beside the axis, so
+ * that panning through a cluster never leaves the reader without a running
+ * order. Entries are text-height rather than card-height, so they collide far
+ * less often than cards — but a dense cluster still crowds them, and two
+ * overprinted titles would make the rail unreadable exactly where it matters
+ * most.
+ */
+describe("rail entries never overprint, and stack the same way twice", () => {
+  const entry = (id: string, screenY: number, height = 15) => ({ item: id, screenY, height });
+
+  it("leaves entries alone when they already clear each other", () => {
+    const stacked = stackRailNodes([entry("a", 0), entry("b", 100), entry("c", 400)], 8);
+    expect(stacked.map((s) => s.top)).toEqual([0, 100, 400]);
+  });
+
+  it("pushes an entry just clear of the one above", () => {
+    // Two groups 4px apart on the axis: the first block is 15 tall, so the
+    // second cannot start before 15 + 8.
+    const stacked = stackRailNodes([entry("a", 100), entry("b", 104)], 8);
+    expect(stacked.map((s) => s.top)).toEqual([100, 123]);
+  });
+
+  it("never lets two entries overlap, however dense the cluster", () => {
+    const entries = Array.from({ length: 12 }, (_, i) => entry(`e${i}`, 500 + i * 0.5));
+    const stacked = stackRailNodes(entries, 8);
+    for (let i = 1; i < stacked.length; i++) {
+      expect(stacked[i]!.top).toBeGreaterThanOrEqual(stacked[i - 1]!.top + 15);
+    }
+  });
+
+  it("sizes a block by its member count, so a five-event cluster clears it", () => {
+    const stacked = stackRailNodes([entry("cluster", 0, 5 * 15), entry("next", 10)], 8);
+    expect(stacked[1]!.top).toBe(83);
+  });
+
+  it("gives the same answer whatever order the entries arrive in", () => {
+    // Reproducibility is what makes an exported PDF match the screen — the same
+    // requirement that makes lane packing greedy over a sorted copy.
+    const entries = [entry("a", 300), entry("b", 100), entry("c", 305), entry("d", 102)];
+    const forward = stackRailNodes(entries, 8);
+    const reversed = stackRailNodes([...entries].reverse(), 8);
+    const byId = (r: { item: string; top: number }[]) =>
+      Object.fromEntries(r.map((x) => [x.item, x.top]));
+    expect(byId(reversed)).toEqual(byId(forward));
+  });
+
+  it("orders entries by position, not by the order they were listed", () => {
+    const stacked = stackRailNodes([entry("late", 900), entry("early", 100)], 8);
+    expect(stacked.map((s) => s.item)).toEqual(["early", "late"]);
+  });
+});
+
+/**
+ * A card, the leader that carries it back to the axis, and the band that leader
+ * lands on are one claim drawn in three places. Lighting one of them has to
+ * light the right two others — an arm belonging to a NEIGHBOUR, lit alongside
+ * the card you are reading, says that card was placed where it was not.
+ */
+describe("an arm can be attributed to the event that owns it", () => {
+  it("marks a point event once, at its own instant", () => {
+    const layout = computeTimelineLayout([
+      event("a", "2019-01-01T00:00:00Z", TimePrecision.Second),
+      event("b", "2019-09-02T00:00:00Z", TimePrecision.Second),
+    ]);
+    const a = layout.positioned.find((p) => p.event.id === "a")!;
+    expect(armsOf(a)).toEqual([a.centerFraction]);
+  });
+
+  it("marks a period at both ends, where the evidence put them", () => {
+    const layout = computeTimelineLayout([
+      event("wide", "2019-01-01T00:00:00Z", TimePrecision.Year),
+      event("point", "2019-09-02T00:00:00Z", TimePrecision.Second),
+    ]);
+    const wide = layout.positioned.find((p) => p.event.id === "wide")!;
+    expect(armsOf(wide)).toEqual([wide.startFraction, wide.endFraction]);
+  });
+
+  it("accounts for every arm a group draws, and claims none that it does not", () => {
+    // The group DEDUPES its arms across members — two events at the same instant
+    // share one — so the group cannot say which member an arm belongs to. This
+    // pins the two answers together: stating the rule twice is how they drift.
+    const layout = computeTimelineLayout([
+      event("call-1", "2019-07-15T14:00:00Z", TimePrecision.Minute),
+      event("call-2", "2019-07-15T16:30:00Z", TimePrecision.Minute),
+      event("far", "2020-03-01T00:00:00Z", TimePrecision.Minute),
+    ]);
+    for (const group of layout.groups) {
+      const union = [...new Set(group.members.flatMap(armsOf))].sort((x, y) => x - y);
+      expect(group.arms).toEqual(union);
+    }
+    const cluster = layout.groups.find((g) => g.members.length > 1)!;
+    expect(cluster.members.map((m) => m.event.id)).toEqual(["call-1", "call-2"]);
+  });
+});
+
+/**
+ * A highlight says "this card came from that mark". The line it draws is the
+ * claim, so it has to cover the route and nothing else: a trunk lit past the
+ * card it points at is pointing at the wrong card, and a rail lit end to end
+ * for one member of a cluster claims four other facts' worth of axis.
+ */
+describe("a lit leader covers the route and no more", () => {
+  const spans = (arms: number[], center: number) => {
+    const span = litRailSpan(arms, center);
+    return [Number(span.start.toFixed(10)), Number(span.size.toFixed(10))];
+  };
+
+  it("reaches from a mark left of the trunk across to the trunk", () => {
+    expect(spans([0.2], 0.5)).toEqual([0.2, 0.3]);
+  });
+
+  it("reaches back from the trunk to a mark on its right", () => {
+    // Expressed against the fraction, not the screen, so `order: descending`
+    // mirrors for free — the same reason AXIS_PLACEMENT anchors from the far edge.
+    expect(spans([0.8], 0.5)).toEqual([0.5, 0.3]);
+  });
+
+  it("gives a period with real width its whole bracket back", () => {
+    // Both arms straddle the centre, so a lone ranged event is unchanged by any
+    // of this — its rail was always entirely its own.
+    expect(spans([0.2, 0.8], 0.5)).toEqual([0.2, 0.6]);
+  });
+
+  it("asks for nothing when the mark sits on the trunk", () => {
+    expect(spans([0.5], 0.5)).toEqual([0.5, 0]);
+  });
+});
+
+describe("splitting a line never lengthens or shortens it", () => {
+  const covers = (pieces: { start: number; size: number }[]) =>
+    pieces.reduce((total, piece) => total + piece.size, 0);
+
+  it("leaves a run whole when nothing is lit", () => {
+    // At rest this is the ONLY path, and it must produce exactly the one
+    // element the layout drew before highlighting existed.
+    expect(splitLitRun(10, 90, null)).toEqual([{ start: 10, size: 90, lit: false }]);
+  });
+
+  it("cuts a run into before, lit and after", () => {
+    const pieces = splitLitRun(0, 100, { start: 30, size: 20 });
+    expect(pieces).toEqual([
+      { start: 0, size: 30, lit: false },
+      { start: 30, size: 20, lit: true },
+      { start: 50, size: 50, lit: false },
+    ]);
+    expect(covers(pieces)).toBe(100);
+  });
+
+  it("drops the empty side when the lit stretch starts at the head", () => {
+    // The trunk's always does: it runs from the branch point down to the card.
+    const pieces = splitLitRun(20, 80, { start: 20, size: 30 });
+    expect(pieces.map((p) => p.lit)).toEqual([true, false]);
+    expect(covers(pieces)).toBe(80);
+  });
+
+  it("returns one lit piece when the lit stretch is the whole run", () => {
+    expect(splitLitRun(0, 100, { start: 0, size: 100 })).toEqual([
+      { start: 0, size: 100, lit: true },
+    ]);
+  });
+
+  it("draws nothing extra for a zero-length lit stretch", () => {
+    expect(splitLitRun(0, 100, { start: 40, size: 0 })).toEqual([
+      { start: 0, size: 40, lit: false },
+      { start: 40, size: 60, lit: false },
+    ]);
+  });
+
+  it("clamps a lit stretch that runs past either end", () => {
+    // Cannot happen from the geometry above, but a leader that grew past the
+    // line it belongs to would be asserting reach the layout never gave it.
+    const pieces = splitLitRun(10, 50, { start: -100, size: 1000 });
+    expect(pieces).toEqual([{ start: 10, size: 50, lit: true }]);
+    expect(covers(pieces)).toBe(50);
   });
 });

@@ -59,12 +59,33 @@ export const mockTimeScaleTimeline: TimelineSpecInput = {
             id: "call-1",
             timestamp: "2019-07-15T09:12:00Z",
             title: "First call",
+            source: {
+                documentId: "doc-phone-log-0114",
+                nodeId: "node-1a03",
+                page: 2,
+                bbox: [
+                    { l: 64, t: 640, r: 501, b: 624 },
+                    { l: 64, t: 624, r: 322, b: 608 },
+                ],
+                coordOrigin: "bottomleft",
+                pageSize: { width: 612, height: 792 },
+                quotedText: "09:12 outgoing, 4 min 11 s, billed to the retainer",
+            },
         },
         {
             id: "call-2",
             timestamp: "2019-07-15T11:40:00+01:00",
             title: "Second call",
             subtitle: "Logged in a different jurisdiction",
+            source: {
+                documentId: "doc-phone-log-0114",
+                nodeId: "node-1a07",
+                page: 2,
+                bbox: [{ l: 64, t: 596, r: 488, b: 580 }],
+                coordOrigin: "bottomleft",
+                pageSize: { width: 612, height: 792 },
+                quotedText: "11:40 local, handset registered in Jersey",
+            },
         },
         {
             id: "wire",
@@ -101,8 +122,31 @@ export const mockTimeScaleTimeline: TimelineSpecInput = {
             precision: TimePrecision.Month,
             title: "Instalments paid",
             subtitle: "February, May and September",
+            // Periods of one fact can come from different documents, so each
+            // span carries its own source and the panel lists all three.
+            source: {
+                documentId: "doc-ledger-2019Q1",
+                nodeId: "node-44b1",
+                page: 11,
+                bbox: [{ l: 90, t: 404, r: 520, b: 388 }],
+                coordOrigin: "bottomleft",
+                pageSize: { width: 612, height: 792 },
+                quotedText: "instalment 1 of 3 received 14 February",
+            },
             spans: [
-                { timestamp: "2019-05-01", precision: TimePrecision.Month },
+                {
+                    timestamp: "2019-05-01",
+                    precision: TimePrecision.Month,
+                    source: {
+                        documentId: "doc-ledger-2019Q2",
+                        nodeId: "node-51c8",
+                        page: 9,
+                        bbox: [{ l: 90, t: 372, r: 517, b: 356 }],
+                        coordOrigin: "bottomleft",
+                        pageSize: { width: 612, height: 792 },
+                        quotedText: "instalment 2 of 3 received 9 May",
+                    },
+                },
                 { timestamp: "2019-09-01", precision: TimePrecision.Month },
             ],
         },

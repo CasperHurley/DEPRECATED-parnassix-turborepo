@@ -11,15 +11,13 @@ function App() {
   return (
     <TamaguiProvider config={config} defaultTheme="dark">
       <Theme name="dark">
-        <YStack 
-          // f={1} 
-          ai="center" 
-          // jc="center" 
-          // gap="$4" 
-          // bg="$background"
-          inset={0} 
-          position={'absolute'}
-        >
+        {/*
+          * In normal flow, not pinned with `position: absolute; inset: 0`.
+          * Pinned, the canvas is locked to the viewport and anything taller is
+          * clipped with no way to scroll to it — which a vertical timeline is
+          * immediately.
+          */}
+        <YStack f={1} bg="$background">
           <ReportCanvas report={mockReport} />
         </YStack>
       </Theme>

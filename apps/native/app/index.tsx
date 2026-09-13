@@ -1,17 +1,13 @@
-import { YStack, XStack, ReportCanvas, mockReport } from "@repo/ui";
+import { ScrollView, YStack, ReportCanvas, mockReport } from "@repo/ui";
 
 export default function Native() {
   return (
-    <YStack 
-      f={1} 
-      // ai="center" 
-      // jc="center" 
-      gap="$4" 
-      bg="$background"
-    >
-      <XStack>
+    // A report is a document: on native nothing scrolls unless something says
+    // so, and a vertical timeline is taller than the screen immediately.
+    <ScrollView f={1} bg="$background" contentContainerStyle={{ minHeight: "100%" }}>
+      <YStack f={1}>
         <ReportCanvas report={mockReport} />
-      </XStack>
-    </YStack>
+      </YStack>
+    </ScrollView>
   );
 }

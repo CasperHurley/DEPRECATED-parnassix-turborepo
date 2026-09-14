@@ -16,5 +16,5 @@ export const ComponentSpecBaseSchema = z.object({
   id: z.string().min(1),
   /** Component-level provenance, where the whole component has one source. */
   source: SourceRefSchema.optional(),
-});
+}).meta({ id: "ComponentSpecBase" });
 export type ComponentSpecBase = z.infer<typeof ComponentSpecBaseSchema>;

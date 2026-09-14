@@ -17,121 +17,7 @@
       "items": {
         "oneOf": [
           {
-            "type": "object",
-            "properties": {
-              "id": {
-                "type": "string",
-                "minLength": 1
-              },
-              "source": {
-                "$ref": "#/$defs/__schema0"
-              },
-              "kind": {
-                "type": "string",
-                "const": "timeline"
-              },
-              "title": {
-                "type": "string"
-              },
-              "subtitle": {
-                "type": "string"
-              },
-              "description": {
-                "type": "string"
-              },
-              "scale": {
-                "default": "ordinal",
-                "type": "string",
-                "enum": [
-                  "ordinal",
-                  "time"
-                ]
-              },
-              "orientation": {
-                "default": "horizontal",
-                "type": "string",
-                "enum": [
-                  "horizontal",
-                  "vertical"
-                ]
-              },
-              "order": {
-                "default": "ascending",
-                "type": "string",
-                "enum": [
-                  "ascending",
-                  "descending"
-                ]
-              },
-              "labelUnit": {
-                "type": "string",
-                "enum": [
-                  "millisecond",
-                  "second",
-                  "minute",
-                  "hour",
-                  "day",
-                  "week",
-                  "month",
-                  "year"
-                ]
-              },
-              "lineVariant": {
-                "$ref": "#/$defs/__schema1"
-              },
-              "events": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "id": {
-                      "$ref": "#/$defs/__schema2"
-                    },
-                    "timestamp": {
-                      "$ref": "#/$defs/__schema3"
-                    },
-                    "precision": {
-                      "$ref": "#/$defs/__schema4"
-                    },
-                    "until": {
-                      "$ref": "#/$defs/__schema6"
-                    },
-                    "untilPrecision": {
-                      "$ref": "#/$defs/__schema7"
-                    },
-                    "title": {
-                      "$ref": "#/$defs/__schema8"
-                    },
-                    "subtitle": {
-                      "$ref": "#/$defs/__schema9"
-                    },
-                    "description": {
-                      "$ref": "#/$defs/__schema10"
-                    },
-                    "lineVariant": {
-                      "$ref": "#/$defs/__schema11"
-                    },
-                    "source": {
-                      "$ref": "#/$defs/__schema12"
-                    },
-                    "spans": {
-                      "$ref": "#/$defs/__schema13"
-                    }
-                  },
-                  "required": [
-                    "id",
-                    "timestamp",
-                    "title"
-                  ]
-                }
-              }
-            },
-            "required": [
-              "id",
-              "kind",
-              "title",
-              "events"
-            ]
+            "$ref": "#/$defs/TimelineSpec"
           }
         ]
       }
@@ -143,79 +29,86 @@
     "components"
   ],
   "$defs": {
+    "TimelineSpec": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/__schema0"
+        },
+        "source": {
+          "$ref": "#/$defs/__schema1"
+        },
+        "kind": {
+          "$ref": "#/$defs/__schema14"
+        },
+        "title": {
+          "$ref": "#/$defs/__schema15"
+        },
+        "subtitle": {
+          "$ref": "#/$defs/__schema16"
+        },
+        "description": {
+          "$ref": "#/$defs/__schema17"
+        },
+        "scale": {
+          "$ref": "#/$defs/__schema18"
+        },
+        "orientation": {
+          "$ref": "#/$defs/__schema19"
+        },
+        "order": {
+          "$ref": "#/$defs/__schema20"
+        },
+        "labelUnit": {
+          "$ref": "#/$defs/__schema21"
+        },
+        "lineVariant": {
+          "$ref": "#/$defs/__schema22"
+        },
+        "events": {
+          "$ref": "#/$defs/__schema23"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "title",
+        "events"
+      ]
+    },
     "__schema0": {
+      "type": "string",
+      "minLength": 1
+    },
+    "__schema1": {
+      "$ref": "#/$defs/SourceRef"
+    },
+    "SourceRef": {
       "type": "object",
       "properties": {
         "documentId": {
-          "type": "string",
-          "minLength": 1
+          "$ref": "#/$defs/__schema2"
         },
         "nodeId": {
-          "type": "string",
-          "minLength": 1
+          "$ref": "#/$defs/__schema3"
         },
         "page": {
-          "type": "integer",
-          "exclusiveMinimum": 0,
-          "maximum": 9007199254740991
+          "$ref": "#/$defs/__schema4"
         },
         "bbox": {
-          "default": [],
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "l": {
-                "type": "number"
-              },
-              "t": {
-                "type": "number"
-              },
-              "r": {
-                "type": "number"
-              },
-              "b": {
-                "type": "number"
-              }
-            },
-            "required": [
-              "l",
-              "t",
-              "r",
-              "b"
-            ]
-          }
+          "$ref": "#/$defs/__schema5"
         },
         "coordOrigin": {
-          "default": "bottomleft",
-          "type": "string",
-          "enum": [
-            "topleft",
-            "bottomleft"
-          ]
+          "$ref": "#/$defs/__schema10"
         },
         "pageSize": {
-          "type": "object",
-          "properties": {
-            "width": {
-              "type": "number",
-              "exclusiveMinimum": 0
-            },
-            "height": {
-              "type": "number",
-              "exclusiveMinimum": 0
-            }
-          },
-          "required": [
-            "width",
-            "height"
-          ]
+          "$ref": "#/$defs/__schema11"
         },
         "chunkId": {
-          "type": "string"
+          "$ref": "#/$defs/__schema12"
         },
         "quotedText": {
-          "type": "string"
+          "$ref": "#/$defs/__schema13"
         }
       },
       "required": [
@@ -224,7 +117,161 @@
         "page"
       ]
     },
-    "__schema1": {
+    "__schema2": {
+      "type": "string",
+      "minLength": 1
+    },
+    "__schema3": {
+      "type": "string",
+      "minLength": 1
+    },
+    "__schema4": {
+      "type": "integer",
+      "exclusiveMinimum": 0,
+      "maximum": 9007199254740991
+    },
+    "__schema5": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/BBox"
+      }
+    },
+    "BBox": {
+      "type": "object",
+      "properties": {
+        "l": {
+          "$ref": "#/$defs/__schema6"
+        },
+        "t": {
+          "$ref": "#/$defs/__schema7"
+        },
+        "r": {
+          "$ref": "#/$defs/__schema8"
+        },
+        "b": {
+          "$ref": "#/$defs/__schema9"
+        }
+      },
+      "required": [
+        "l",
+        "t",
+        "r",
+        "b"
+      ]
+    },
+    "__schema6": {
+      "type": "number"
+    },
+    "__schema7": {
+      "type": "number"
+    },
+    "__schema8": {
+      "type": "number"
+    },
+    "__schema9": {
+      "type": "number"
+    },
+    "__schema10": {
+      "default": "bottomleft",
+      "$ref": "#/$defs/CoordOrigin"
+    },
+    "CoordOrigin": {
+      "type": "string",
+      "enum": [
+        "topleft",
+        "bottomleft"
+      ]
+    },
+    "__schema11": {
+      "type": "object",
+      "properties": {
+        "width": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "height": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      },
+      "required": [
+        "width",
+        "height"
+      ]
+    },
+    "__schema12": {
+      "type": "string"
+    },
+    "__schema13": {
+      "type": "string"
+    },
+    "__schema14": {
+      "type": "string",
+      "const": "timeline"
+    },
+    "__schema15": {
+      "type": "string"
+    },
+    "__schema16": {
+      "type": "string"
+    },
+    "__schema17": {
+      "type": "string"
+    },
+    "__schema18": {
+      "default": "ordinal",
+      "$ref": "#/$defs/TimelineScale"
+    },
+    "TimelineScale": {
+      "type": "string",
+      "enum": [
+        "ordinal",
+        "time"
+      ]
+    },
+    "__schema19": {
+      "default": "horizontal",
+      "$ref": "#/$defs/TimelineOrientation"
+    },
+    "TimelineOrientation": {
+      "type": "string",
+      "enum": [
+        "horizontal",
+        "vertical"
+      ]
+    },
+    "__schema20": {
+      "default": "ascending",
+      "$ref": "#/$defs/TimelineOrder"
+    },
+    "TimelineOrder": {
+      "type": "string",
+      "enum": [
+        "ascending",
+        "descending"
+      ]
+    },
+    "__schema21": {
+      "$ref": "#/$defs/UnitOfTime"
+    },
+    "UnitOfTime": {
+      "type": "string",
+      "enum": [
+        "millisecond",
+        "second",
+        "minute",
+        "hour",
+        "day",
+        "week",
+        "month",
+        "year"
+      ]
+    },
+    "__schema22": {
+      "$ref": "#/$defs/LineVariant"
+    },
+    "LineVariant": {
       "type": "string",
       "enum": [
         "solid",
@@ -233,28 +280,83 @@
         "none"
       ]
     },
-    "__schema2": {
+    "__schema23": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/TimelineEventSpec"
+      }
+    },
+    "TimelineEventSpec": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/__schema24"
+        },
+        "timestamp": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "precision": {
+          "$ref": "#/$defs/__schema27"
+        },
+        "until": {
+          "$ref": "#/$defs/__schema28"
+        },
+        "untilPrecision": {
+          "$ref": "#/$defs/__schema29"
+        },
+        "title": {
+          "$ref": "#/$defs/__schema30"
+        },
+        "subtitle": {
+          "$ref": "#/$defs/__schema31"
+        },
+        "description": {
+          "$ref": "#/$defs/__schema32"
+        },
+        "lineVariant": {
+          "$ref": "#/$defs/__schema33"
+        },
+        "source": {
+          "$ref": "#/$defs/__schema34"
+        },
+        "spans": {
+          "$ref": "#/$defs/__schema35"
+        }
+      },
+      "required": [
+        "id",
+        "timestamp",
+        "title"
+      ]
+    },
+    "__schema24": {
       "type": "string",
       "minLength": 1
     },
-    "__schema3": {
+    "Timestamp": {
       "anyOf": [
         {
-          "type": "string",
-          "format": "date-time",
-          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          "$ref": "#/$defs/__schema25"
         },
         {
-          "type": "string",
-          "format": "date",
-          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          "$ref": "#/$defs/__schema26"
         }
       ]
     },
-    "__schema4": {
-      "$ref": "#/$defs/__schema5"
+    "__schema25": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
     },
-    "__schema5": {
+    "__schema26": {
+      "type": "string",
+      "format": "date",
+      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+    },
+    "__schema27": {
+      "$ref": "#/$defs/TimePrecision"
+    },
+    "TimePrecision": {
       "type": "string",
       "enum": [
         "year",
@@ -266,56 +368,59 @@
         "millisecond"
       ]
     },
-    "__schema6": {
-      "$ref": "#/$defs/__schema3"
+    "__schema28": {
+      "$ref": "#/$defs/Timestamp"
     },
-    "__schema7": {
-      "$ref": "#/$defs/__schema5"
+    "__schema29": {
+      "$ref": "#/$defs/TimePrecision"
     },
-    "__schema8": {
+    "__schema30": {
       "type": "string"
     },
-    "__schema9": {
+    "__schema31": {
       "type": "string"
     },
-    "__schema10": {
+    "__schema32": {
       "type": "string"
     },
-    "__schema11": {
-      "$ref": "#/$defs/__schema1"
+    "__schema33": {
+      "$ref": "#/$defs/LineVariant"
     },
-    "__schema12": {
-      "$ref": "#/$defs/__schema0"
+    "__schema34": {
+      "$ref": "#/$defs/SourceRef"
     },
-    "__schema13": {
+    "__schema35": {
       "default": [],
       "type": "array",
       "items": {
-        "type": "object",
-        "properties": {
-          "timestamp": {
-            "$ref": "#/$defs/__schema3"
-          },
-          "precision": {
-            "$ref": "#/$defs/__schema4"
-          },
-          "until": {
-            "$ref": "#/$defs/__schema6"
-          },
-          "untilPrecision": {
-            "$ref": "#/$defs/__schema7"
-          },
-          "source": {
-            "$ref": "#/$defs/__schema14"
-          }
-        },
-        "required": [
-          "timestamp"
-        ]
+        "$ref": "#/$defs/TimeSpan"
       }
     },
-    "__schema14": {
-      "$ref": "#/$defs/__schema0"
+    "TimeSpan": {
+      "type": "object",
+      "properties": {
+        "timestamp": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "precision": {
+          "$ref": "#/$defs/__schema27"
+        },
+        "until": {
+          "$ref": "#/$defs/__schema28"
+        },
+        "untilPrecision": {
+          "$ref": "#/$defs/__schema29"
+        },
+        "source": {
+          "$ref": "#/$defs/__schema36"
+        }
+      },
+      "required": [
+        "timestamp"
+      ]
+    },
+    "__schema36": {
+      "$ref": "#/$defs/SourceRef"
     }
   }
 }

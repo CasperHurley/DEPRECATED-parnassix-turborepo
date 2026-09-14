@@ -10,7 +10,9 @@ import { SourceRefSchema } from "./source";
  * knowledge is itself meaningful evidence — a document that says "January 2023"
  * should not be promoted to a fabricated `2023-01-01T00:00:00Z`.
  */
-export const TimestampSchema = z.union([z.iso.datetime({ offset: true }), z.iso.date()]);
+export const TimestampSchema = z
+  .union([z.iso.datetime({ offset: true }), z.iso.date()])
+  .meta({ id: "Timestamp" });
 export type Timestamp = z.infer<typeof TimestampSchema>;
 
 /** How a connecting line is drawn. Shared across components that draw lines. */
@@ -21,7 +23,7 @@ export const LineVariant = {
   None: "none",
 } as const;
 export type LineVariant = (typeof LineVariant)[keyof typeof LineVariant];
-export const LineVariantSchema = z.enum(LineVariant);
+export const LineVariantSchema = z.enum(LineVariant).meta({ id: "LineVariant" });
 
 /**
  * Calendar granularity.
@@ -41,7 +43,7 @@ export const UnitOfTime = {
   Year: "year",
 } as const;
 export type UnitOfTime = (typeof UnitOfTime)[keyof typeof UnitOfTime];
-export const UnitOfTimeSchema = z.enum(UnitOfTime);
+export const UnitOfTimeSchema = z.enum(UnitOfTime).meta({ id: "UnitOfTime" });
 
 /**
  * How much of a timestamp is actually *known*.
@@ -78,7 +80,7 @@ export const TimePrecision = {
   Millisecond: "millisecond",
 } as const;
 export type TimePrecision = (typeof TimePrecision)[keyof typeof TimePrecision];
-export const TimePrecisionSchema = z.enum(TimePrecision);
+export const TimePrecisionSchema = z.enum(TimePrecision).meta({ id: "TimePrecision" });
 
 /** Precisions that require a time-of-day component to be meaningful. */
 const SUB_DAY_PRECISIONS: readonly TimePrecision[] = [
@@ -497,7 +499,8 @@ export const TimeSpanSchema = z
     /** Periods of one fact can come from different documents. */
     source: SourceRefSchema.optional(),
   })
-  .superRefine(checkTimeSpan);
+  .superRefine(checkTimeSpan)
+  .meta({ id: "TimeSpan" });
 export type TimeSpan = z.infer<typeof TimeSpanSchema>;
 
 /**

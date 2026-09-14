@@ -15,12 +15,14 @@ import { z } from "zod";
  * A bounding box in the source document's own coordinate space.
  * Field names follow Docling's convention (left/top/right/bottom).
  */
-export const BBoxSchema = z.object({
-  l: z.number(),
-  t: z.number(),
-  r: z.number(),
-  b: z.number(),
-});
+export const BBoxSchema = z
+  .object({
+    l: z.number(),
+    t: z.number(),
+    r: z.number(),
+    b: z.number(),
+  })
+  .meta({ id: "BBox" });
 export type BBox = z.infer<typeof BBoxSchema>;
 
 /**
@@ -35,7 +37,7 @@ export const CoordOrigin = {
   BottomLeft: "bottomleft",
 } as const;
 export type CoordOrigin = (typeof CoordOrigin)[keyof typeof CoordOrigin];
-export const CoordOriginSchema = z.enum(CoordOrigin);
+export const CoordOriginSchema = z.enum(CoordOrigin).meta({ id: "CoordOrigin" });
 
 export const SourceRefSchema = z.object({
   /** The source document this fact was extracted from. */
@@ -62,5 +64,5 @@ export const SourceRefSchema = z.object({
   chunkId: z.string().optional(),
   /** Verbatim source text, for footnote-style rendering on export. */
   quotedText: z.string().optional(),
-});
+}).meta({ id: "SourceRef" });
 export type SourceRef = z.infer<typeof SourceRefSchema>;

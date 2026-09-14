@@ -194,7 +194,12 @@ describe("the wire contract actually constrains agent output", () => {
     // reproduce it. The Python side needs its own validator for this one, or a
     // date-only/minute-precision pair will pass Pydantic and fail here.
     const emitted = z.toJSONSchema(TimelineEventSpecSchema, { io: "input" });
-    expect(emitted.properties).toHaveProperty("precision");
+    // Named schemas (`.meta({ id })`, which is what gives the emitted artifact
+    // readable `$defs` keys for Python codegen) convert to a `$ref` into
+    // `$defs` rather than inlining. Follow it rather than asserting on the
+    // wrapper.
+    const root = emitted.$defs?.["TimelineEventSpec"] ?? emitted;
+    expect(root.properties).toHaveProperty("precision");
     expect(JSON.stringify(emitted)).not.toContain("finer than the timestamp");
   });
 });

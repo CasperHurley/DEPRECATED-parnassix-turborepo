@@ -27,7 +27,9 @@ export const TimelineOrientation = {
 } as const;
 export type TimelineOrientation =
   (typeof TimelineOrientation)[keyof typeof TimelineOrientation];
-export const TimelineOrientationSchema = z.enum(TimelineOrientation);
+export const TimelineOrientationSchema = z
+  .enum(TimelineOrientation)
+  .meta({ id: "TimelineOrientation" });
 
 /**
  * Which way time advances along that axis.
@@ -49,7 +51,7 @@ export const TimelineOrder = {
   Descending: "descending",
 } as const;
 export type TimelineOrder = (typeof TimelineOrder)[keyof typeof TimelineOrder];
-export const TimelineOrderSchema = z.enum(TimelineOrder);
+export const TimelineOrderSchema = z.enum(TimelineOrder).meta({ id: "TimelineOrder" });
 
 /**
  * How event position is computed along the axis.
@@ -65,7 +67,7 @@ export const TimelineScale = {
   Time: "time",
 } as const;
 export type TimelineScale = (typeof TimelineScale)[keyof typeof TimelineScale];
-export const TimelineScaleSchema = z.enum(TimelineScale);
+export const TimelineScaleSchema = z.enum(TimelineScale).meta({ id: "TimelineScale" });
 
 export const TimelineEventSpecSchema = z.object({
   /**
@@ -97,7 +99,9 @@ export const TimelineEventSpecSchema = z.object({
    * both lean on.
    */
   spans: z.array(TimeSpanSchema).default([]),
-}).superRefine(checkTimeSpan);
+})
+  .superRefine(checkTimeSpan)
+  .meta({ id: "TimelineEventSpec" });
 export type TimelineEventSpec = z.infer<typeof TimelineEventSpecSchema>;
 /** What an agent writes: defaulted fields are still optional here. */
 export type TimelineEventSpecInput = z.input<typeof TimelineEventSpecSchema>;
@@ -123,7 +127,7 @@ export const TimelineSpecSchema = ComponentSpecBaseSchema.extend({
   /** Default line style for events that do not override it. */
   lineVariant: LineVariantSchema.optional(),
   events: z.array(TimelineEventSpecSchema),
-});
+}).meta({ id: "TimelineSpec" });
 export type TimelineSpec = z.infer<typeof TimelineSpecSchema>;
 export type TimelineSpecInput = z.input<typeof TimelineSpecSchema>;
 

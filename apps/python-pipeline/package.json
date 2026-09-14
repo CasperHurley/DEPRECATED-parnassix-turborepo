@@ -1,0 +1,19 @@
+{
+  "name": "python-pipeline",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Turbo shim for the Python document pipeline. The real project is pyproject.toml; these scripts exist so the app joins the task graph and can declare a build dependency on the wire contract.",
+  "scripts": {
+    "build": "uv sync --frozen && uv run python scripts/generate_models.py",
+    "dev": "uv run aneural-pipeline serve --reload",
+    "lint": "uv run ruff check src tests scripts",
+    "format": "uv run ruff format src tests scripts",
+    "test": "uv run pytest",
+    "clean": "rm -rf .venv .aneural-cache .pytest_cache src/aneural_pipeline/report/_generated.py",
+    "redis:up": "docker compose up -d",
+    "redis:down": "docker compose down"
+  },
+  "devDependencies": {
+    "@repo/report-schema": "workspace:*"
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "inputs": [
+        "pyproject.toml",
+        "uv.lock",
+        "scripts/**",
+        "src/**",
+        "../../packages/report-schema/schema/report-schema.json"
+      ],
+      "outputs": ["src/aneural_pipeline/report/_generated.py"]
+    },
+    "test": {
+      "dependsOn": ["build"],
+      "outputs": []
+    },
+    "lint": {
+      "dependsOn": ["build"]
+    }
+  }
+}

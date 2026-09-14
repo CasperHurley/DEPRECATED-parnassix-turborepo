@@ -12,6 +12,7 @@ A cross-platform monorepo: one shared Tamagui component layer rendered by a web 
 | `apps/native`     | Expo SDK 57 + React Native 0.86 | iOS, Android, and native-web via Metro |
 | `apps/desktop`    | Electron 44 + electron-vite 5   | macOS/Windows/Linux desktop app        |
 | `apps/api-client` | NestJS 12 on Fastify            | HTTP API                               |
+| `apps/python-pipeline` | Python 3.13 + Docling + LlamaIndex | Documents → embeddings + per-fact provenance |
 
 ### Packages
 
@@ -20,6 +21,11 @@ A cross-platform monorepo: one shared Tamagui component layer rendered by a web 
 | `packages/ui` (`@repo/ui`)                               | The shared design system. Re-exports all of Tamagui plus the single shared `config`, built to CJS + ESM + types with `tsup`. |
 | `packages/report-schema` (`@repo/report-schema`)          | The wire contract between the agents and the renderer. Zod schemas are the source of truth; emits committed JSON Schema for the Python service to generate Pydantic models from. |
 | `packages/typescript-config` (`@repo/typescript-config`) | Shared `tsconfig.json` bases.                                                                                                |
+
+The Python app is a full turbo citizen: a thin `package.json` maps `build`/`dev`/`lint`/`test`
+onto `uv`, and its build depends on `@repo/report-schema` so the Zod → JSON Schema → Pydantic
+codegen reruns whenever the contract changes. It needs `uv`, Docker (for Redis Stack) and
+Ollama; see `apps/python-pipeline/README.md`.
 
 All three UI apps import from `@repo/ui`, so a component or theme token changes in one place and lands everywhere.
 
@@ -67,6 +73,7 @@ Run one app on its own:
 pnpm --filter web-vite dev
 pnpm --filter desktop dev
 pnpm --filter api-client dev
+pnpm --filter python-pipeline dev   # needs Redis: pnpm --filter python-pipeline redis:up
 pnpm --filter native dev      # expo start --web
 ```
 
@@ -97,6 +104,7 @@ pnpm ios                    # expo run:ios - full native build, generates ios/
 | `desktop` renderer | 5173, or 5174 when `web-vite` already holds it |
 | `native` (Metro)   | 8081                                           |
 | `api-client`       | 3000                                           |
+| `python-pipeline`  | 8000 (Redis 6379, RedisInsight 8001)           |
 
 ## Workspace constraints
 

@@ -1,0 +1,19 @@
+# Redis Stack, not plain Redis. The vector index and the semantic cache both
+# need the RediSearch module, which the stock redis image does not ship.
+services:
+  redis:
+    image: redis/redis-stack:latest
+    container_name: aneural-redis
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+      - "${REDIS_INSIGHT_PORT:-8001}:8001" # RedisInsight UI
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  redis-data:

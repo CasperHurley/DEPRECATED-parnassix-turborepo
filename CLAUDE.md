@@ -13,19 +13,27 @@ quality bar: **every fact shown must be traceable to its source**. The canonical
 design against is the lawyer who cited a case that did not exist. This tool must never be
 able to do that.
 
-### The wider system (mostly outside this repo)
+### The wider system
 
 | Piece | Where | Role |
 | --- | --- | --- |
-| Corpus ingestion | Python service (separate repo) | PDFs via LlamaIndex + `DoclingReader` / `DoclingNodeParser` → `VectorStoreIndex`. Extracts data, embeddings, and per-item provenance (page + bbox). |
-| Agent workflows | Same Python service | Populate component templates. Invalid enum values are caught and handed back to an agent for a limited number of retries — **this repo does not own that retry loop**. |
+| Corpus ingestion + retrieval | `apps/python-pipeline` | Docling → chunks → embeddings in Redis, with per-fact provenance (page + bbox + page size). Resolves node ids back to citations. **[built]** |
+| Agent workflows | `apps/python-pipeline` (not built) | Populate component templates. Invalid enum values are caught and handed back to an agent for a limited number of retries. |
 | API gateway | `apps/api-client` (NestJS/Fastify) | Routes between frontends and Python. Validates at the public boundary. |
 | Frontends | `apps/web-vite`, `apps/desktop`, `apps/native` | Render reports from the shared `@repo/ui` component layer. |
 
 Embedding model is configured **per corpus, not globally** (local Ollama/HuggingFace for
 privileged documents; hosted OpenAI when a client brings their own key). Model name and
 dimension are stored in index metadata so a mismatch fails loudly — indexes are not portable
-across embedding models.
+across embedding models. The index NAME also carries the model identity, so two models cannot
+collide on one index in the first place, and a corpus can be indexed under several models at
+once to compare them.
+
+The Python side lives in this repo rather than a separate one, so the JSON Schema → Pydantic
+codegen is a turbo build edge rather than a thing someone remembers to run. Model choice
+defaults from detected hardware (a memory tier picks a model per ROLE — corpus embedding,
+cache embedding, generation), and **no tier ever defaults to a hosted model**: detection must
+never be the reason a run starts costing money or sends privileged documents off the machine.
 
 ## Repo layout
 
@@ -79,21 +87,44 @@ Validation runs in three places for three reasons: Python validates its agents' 
 boundary per component, keyed by `id`. A user mid-walkthrough loses one panel, not the
 whole document.
 
-### Provenance is per-fact, first-class — [built: type + on-screen rendering; shape provisional]
+### Provenance is per-fact, first-class — [built: type, on-screen rendering, and the pipeline that produces it]
 
 Citation granularity is per *fact* (a timeline event, a table cell), not per component. A
 `SourceRef` belongs both on base `ComponentProps` and on individual data points.
 
-Working shape, to be firmed up as the Python backend matures:
-
 ```ts
-{ documentId, nodeId, page, bbox, chunkId?, quotedText? }
+{ documentId, nodeId, page, bbox, coordOrigin, pageSize?, chunkId?, quotedText? }
 ```
 
-LlamaIndex nodes carry a stable `node_id` and Docling preserves per-item page + bbox, so
-this should round-trip to a highlight. **Gotcha to verify:** PDF bounding boxes are
-conventionally bottom-left origin while the renderer is top-left — a highlight overlay needs
-page height to flip them.
+`apps/python-pipeline` now produces this, and three things about it were settled by running
+a real conversion rather than by reading documentation:
+
+- **The bottom-left gotcha was real, and worse than stated.** Docling emits `BOTTOMLEFT` for
+  PDF content, and in that space **`t > b`** — `t` is the visually-upper edge holding the
+  LARGER y. Flipping needs page height *and* has to swap the two edges' roles; treating `t`
+  as a screen-space top mirrors every highlight about the page midline, which reads as a
+  plausible offset rather than as a bug.
+- **The pipeline flips to top-left at ingestion** (docling's own `to_top_left_origin`) and
+  states the result in `coordOrigin`, so the renderer's flip path is a fallback rather than
+  the primary one. `pageSize` is sent regardless, because points still have to be scaled to
+  whatever width the page was drawn at.
+- **`nodeId` is NOT LlamaIndex's default id.** `DoclingNodeParser` assigns `uuid4`, so
+  re-ingesting an unchanged document would mint new ids and every `SourceRef` in every saved
+  report would stop resolving. The pipeline derives ids from content instead: stable across
+  reruns, and *different* when the text changes, so an id can never silently rebind to
+  different words.
+
+One shape consequence worth knowing: a `SourceRef` carries one `page` and many `bbox`es, but
+a chunk can straddle a page break. Such a chunk yields **one ref per page**, all sharing a
+`nodeId`.
+
+**Citation is resolved server-side, never copied by a model.** The LLM is not shown
+coordinates and does not emit them; it emits a `nodeId`, and the pipeline resolves it. An
+id the model invented resolves to nothing and is reported as unresolvable — a visible
+failure rather than a well-formed citation pointing at the wrong place. This is the same
+anti-hallucination rule as "citations in chat are structural, not textual", applied to the
+ingestion side, and it is pinned by a test asserting coordinates never enter the model's
+view of a node.
 
 Citations must degrade for print: interactive highlight-in-the-PDF on screen, numbered
 footnote markers plus a reference table on export. Same data, two presentations.
@@ -629,8 +660,20 @@ Python side expands any such rule into `spans` before it crosses the wire.
 
 The wire contract exists and is enforced; the rendering is still scaffolding.
 
+- `apps/python-pipeline` — Docling → chunks → Redis vector index, with per-fact provenance.
+  `hardware.py` + `models/registry.py` (tier detection → a model per role), `config.py`
+  (per-corpus model binding; index name carries model identity), `ingest/` (`converter.py`
+  content-hashed conversion cache, `provenance.py` the bbox/origin/page-size mapping,
+  `nodes.py` stable ids and the LLM-visibility boundary, `pipeline.py`), `index/`
+  (vector store with metadata guard, semantic cache), `retrieval/` (query + server-side
+  citation resolution), `api/` (FastAPI), `report/` (generated Pydantic + the validators
+  JSON Schema cannot carry). Python pinned to 3.13 by
+  `llama-index-vector-stores-redis`, which also holds `redisvl` at the 0.4 line.
 - `packages/report-schema` (`@repo/report-schema`) — the wire contract, Zod as source of
-  truth, zero deps but zod. `source.ts` (SourceRef/BBox), `primitives.ts` (Timestamp,
+  truth, zero deps but zod. Reused schemas carry `.meta({ id })` so the emitted JSON Schema
+  has named `$defs` — without them Python codegen produces `FieldSchema0` instead of
+  `SourceRef`. Note that naming a schema makes a standalone `z.toJSONSchema` call return a
+  `$ref` into `$defs` rather than inlining it. `source.ts` (SourceRef/BBox), `primitives.ts` (Timestamp,
   UnitOfTime, LineVariant), `component.ts` (ComponentSpecBase), `timeline.ts`, `report.ts`
   (the `kind` discriminated union + `ReportSpec`). Emits committed JSON Schema to `schema/`.
   Re-exports `z` so consumers share one zod instance.
@@ -667,10 +710,17 @@ Known gaps:
   `@repo/report-schema` mid-session does not retrigger ui's declaration emit. Runtime is
   fine; `.d.ts` can go stale until the next build.
 - `apps/api-client` does not consume the contract yet. Reusing the Zod schemas for NestJS DTO
-  validation is the natural next step there.
+  validation is the natural next step there. It also does not yet route to
+  `apps/python-pipeline`, which currently serves on :8000 directly.
+- The Zod `superRefine` rules are reimplemented in Python (`report/validate.py`) because
+  JSON Schema cannot carry them. Two implementations of one rule set can drift; tests pin
+  both to the same examples, but a new cross-field rule has to be added in both places.
 
 ## Immediate next work
 
+0. Draw the highlights. The pipeline now emits top-left boxes with page sizes, so the
+   Timeline's `DetailPanel` has everything it needs to stop reporting "N regions" and
+   actually render them over a page image.
 1. A second component (Table) — the first real test of whether adding a `kind` is mechanical.
 2. The chat/SSE session layer and the canvas mutation protocol
    (append / replace-by-id / remove), which the current snapshot-shaped `ReportSpec`

@@ -1,8 +1,8 @@
-# Aneural — frontend monorepo
+# Parnassix — frontend monorepo
 
 ## What this project is
 
-Aneural generates **reports assembled from reusable, deterministic components**. The
+Parnassix generates **reports assembled from reusable, deterministic components**. The
 frontend is a *renderer*: component templates are fixed in shape, and backend agents
 influence output only by choosing enum values and supplying data. That bound is the point —
 a hallucinating agent can produce wrong data, but it cannot produce a shape this repo

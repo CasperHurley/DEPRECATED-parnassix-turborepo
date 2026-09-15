@@ -33,7 +33,7 @@ const schema = z.toJSONSchema(ReportSpecSchema, {
 
 const artifact =
   JSON.stringify(
-    { $id: `https://aneural.dev/schema/report/${SCHEMA_VERSION}`, ...schema },
+    { $id: `https://parnassix.dev/schema/report/${SCHEMA_VERSION}`, ...schema },
     null,
     2,
   ) + "\n";

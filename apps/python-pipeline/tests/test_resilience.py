@@ -13,10 +13,10 @@ from pathlib import Path
 
 import pytest
 
-from aneural_pipeline.config import CorpusConfig, get_settings
-from aneural_pipeline.ingest import ConversionOptions, OcrEngineChoice
-from aneural_pipeline.ingest.pipeline import FailedDocument, IngestReport, ingest
-from aneural_pipeline.models.registry import (
+from parnassix_pipeline.config import CorpusConfig, get_settings
+from parnassix_pipeline.ingest import ConversionOptions, OcrEngineChoice
+from parnassix_pipeline.ingest.pipeline import FailedDocument, IngestReport, ingest
+from parnassix_pipeline.models.registry import (
     EMBEDDING_MODELS,
     load_catalog_overrides,
     resolve_embedding_model,
@@ -34,7 +34,7 @@ def test_a_missing_document_does_not_abort_the_batch(tmp_path, monkeypatch):
 
     # Stop before the embedding step: this is about the conversion loop, and it
     # should not need Ollama or Redis to be running.
-    import aneural_pipeline.ingest.pipeline as pipeline
+    import parnassix_pipeline.ingest.pipeline as pipeline
 
     captured: dict = {}
 
@@ -134,7 +134,7 @@ def test_catalog_override_adds_a_model(tmp_path, monkeypatch):
             }
         )
     )
-    monkeypatch.setenv("ANEURAL_MODEL_CATALOG", str(catalog))
+    monkeypatch.setenv("PARNASSIX_MODEL_CATALOG", str(catalog))
     try:
         model = resolve_embedding_model("my-finetune")
         assert model.dimension == 1024
@@ -149,13 +149,13 @@ def test_catalog_override_refuses_an_embedding_without_a_dimension(tmp_path, mon
     """Dimension cannot be defaulted: a wrong one fails only at query time."""
     catalog = tmp_path / "bad.json"
     catalog.write_text(json.dumps({"embedding": {"nope": {"provider": "ollama"}}}))
-    monkeypatch.setenv("ANEURAL_MODEL_CATALOG", str(catalog))
+    monkeypatch.setenv("PARNASSIX_MODEL_CATALOG", str(catalog))
     with pytest.raises(ValueError, match="dimension"):
         load_catalog_overrides()
 
 
 def test_a_missing_catalog_file_is_an_error_not_a_shrug(tmp_path, monkeypatch):
     """Silently ignoring it would run the whole corpus on the wrong models."""
-    monkeypatch.setenv("ANEURAL_MODEL_CATALOG", str(tmp_path / "absent.json"))
+    monkeypatch.setenv("PARNASSIX_MODEL_CATALOG", str(tmp_path / "absent.json"))
     with pytest.raises(FileNotFoundError):
         load_catalog_overrides()

@@ -288,7 +288,7 @@ def load_catalog_overrides(path: str | Path | None = None) -> int:
 
     The built-in catalogue cannot know about a model released next month, a
     private fine-tune, or an internal endpoint. Rather than force a code change
-    for each, point `ANEURAL_MODEL_CATALOG` at a JSON file:
+    for each, point `PARNASSIX_MODEL_CATALOG` at a JSON file:
 
         {
           "embedding": {
@@ -312,13 +312,13 @@ def load_catalog_overrides(path: str | Path | None = None) -> int:
     Overrides may replace built-in entries by name, which is the supported way
     to repoint a tag at a different endpoint without editing this file.
     """
-    raw = path or os.environ.get("ANEURAL_MODEL_CATALOG")
+    raw = path or os.environ.get("PARNASSIX_MODEL_CATALOG")
     if not raw:
         return 0
     catalog_path = Path(raw)
     if not catalog_path.is_file():
         raise FileNotFoundError(
-            f"ANEURAL_MODEL_CATALOG points at {catalog_path}, which does not exist"
+            f"PARNASSIX_MODEL_CATALOG points at {catalog_path}, which does not exist"
         )
 
     data = json.loads(catalog_path.read_text())

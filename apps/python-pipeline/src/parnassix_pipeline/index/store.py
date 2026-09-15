@@ -29,7 +29,7 @@ from ..config import CorpusConfig, Settings
 
 log = logging.getLogger(__name__)
 
-_METADATA_KEY_PREFIX = "aneural:index-meta:"
+_METADATA_KEY_PREFIX = "parnassix:index-meta:"
 
 
 @dataclass(frozen=True)

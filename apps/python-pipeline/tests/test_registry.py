@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import pytest
 
-from aneural_pipeline.config import CorpusConfig
-from aneural_pipeline.hardware import Tier, detect_machine
-from aneural_pipeline.models import EMBEDDING_MODELS, Role, default_embedding_model
-from aneural_pipeline.models.registry import _TIER_DEFAULTS
+from parnassix_pipeline.config import CorpusConfig
+from parnassix_pipeline.hardware import Tier, detect_machine
+from parnassix_pipeline.models import EMBEDDING_MODELS, Role, default_embedding_model
+from parnassix_pipeline.models.registry import _TIER_DEFAULTS
 
 
 def test_every_tier_names_a_model_for_every_role():
@@ -48,7 +48,7 @@ def test_unknown_model_is_rejected_not_guessed():
 
 def test_forced_tier_overrides_detection(monkeypatch):
     detect_machine.cache_clear()
-    monkeypatch.setenv("ANEURAL_TIER", "small")
+    monkeypatch.setenv("PARNASSIX_TIER", "small")
     try:
         assert detect_machine().tier is Tier.SMALL
     finally:

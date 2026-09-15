@@ -1,5 +1,5 @@
 .venv/
-.aneural-cache/
+.parnassix-cache/
 .pytest_cache/
 .ruff_cache/
 __pycache__/
@@ -7,4 +7,4 @@ __pycache__/
 .env
 # Generated from packages/report-schema/schema/report-schema.json at build time.
 # Committing it would create a second copy of the contract that can drift.
-src/aneural_pipeline/report/_generated.py
+src/parnassix_pipeline/report/_generated.py

@@ -31,10 +31,10 @@ pnpm --filter python-pipeline redis:up      # Redis Stack (RediSearch + semantic
 uv sync                                     # or: pnpm --filter python-pipeline build
 uv run python scripts/make_sample_pdf.py    # a 3-page fixture with known content
 
-uv run aneural-pipeline machine                                 # what this box will pick
-uv run aneural-pipeline ingest samples/sample-agreement.pdf --corpus demo
-uv run aneural-pipeline query "What is the liability cap?" --corpus demo
-uv run aneural-pipeline serve                                   # HTTP on :8000
+uv run parnassix-pipeline machine                                 # what this box will pick
+uv run parnassix-pipeline ingest samples/sample-agreement.pdf --corpus demo
+uv run parnassix-pipeline query "What is the liability cap?" --corpus demo
+uv run parnassix-pipeline serve                                   # HTTP on :8000
 ```
 
 Ollama must be running, with an embedding model pulled (`ollama pull bge-m3`).
@@ -60,9 +60,9 @@ like digital ones.
 
 ```sh
 uv sync --extra ocrmac
-uv run aneural-pipeline ingest scan.pdf --ocr                    # picks native on macOS
-uv run aneural-pipeline ingest scan.pdf --ocr --full-page-ocr    # scans with a junk text layer
-uv run aneural-pipeline ingest scan.pdf --ocr --ocr-engine tesseract
+uv run parnassix-pipeline ingest scan.pdf --ocr                    # picks native on macOS
+uv run parnassix-pipeline ingest scan.pdf --ocr --full-page-ocr    # scans with a junk text layer
+uv run parnassix-pipeline ingest scan.pdf --ocr --ocr-engine tesseract
 ```
 
 `--full-page-ocr` matters more than it sounds: cheap scanning software often
@@ -95,7 +95,7 @@ the batch: failures are collected per document and re-reported at the end.
 
 ## Model selection is per corpus, and by machine
 
-`aneural-pipeline machine` detects total memory and picks a **tier**, and the
+`parnassix-pipeline machine` detects total memory and picks a **tier**, and the
 tier picks a model per **role**. Roles are separate because their cost profiles
 are: embedding a corpus is a big one-off batch, embedding a query for the cache
 happens on every request, and generation is where hosted tokens get expensive.
@@ -120,8 +120,8 @@ over Thunderbolt and exposes an OpenAI-compatible API, so a cluster is reachable
 through the ordinary `openai-compatible` provider — no special client:
 
 ```sh
-export ANEURAL_EXO_BASE_URL=http://localhost:8000/v1
-uv run aneural-pipeline machine     # reports the cluster, tier becomes `cluster`
+export PARNASSIX_EXO_BASE_URL=http://localhost:8000/v1
+uv run parnassix-pipeline machine     # reports the cluster, tier becomes `cluster`
 ```
 
 Two deliberate choices. Detection is **opt-in** rather than probed by default:
@@ -137,14 +137,14 @@ more than running a 567M-parameter model on the machine you are already on.
 | --- | --- |
 | `ollama` | Local daemon. The default everywhere. |
 | `huggingface` | Local, in-process (`--extra huggingface`). Runs in CI. |
-| `openai` | Hosted. Honours `ANEURAL_OPENAI_BASE_URL`, so a gateway can sit in front. |
+| `openai` | Hosted. Honours `PARNASSIX_OPENAI_BASE_URL`, so a gateway can sit in front. |
 | `bedrock` | AWS Bedrock (`--extra bedrock`). Hosted, but in the customer's own account and region — often the only acceptable hosted option for privileged documents. Credentials come from the standard AWS chain. |
 | `openai-compatible` | Any OpenAI-wire endpoint (`--extra compatible`): exo, vLLM, LM Studio, or an AI gateway. |
 
 ### Bringing your own models
 
 The built-in catalogue cannot know about a model released next month or a
-private fine-tune. Point `ANEURAL_MODEL_CATALOG` at a JSON file:
+private fine-tune. Point `PARNASSIX_MODEL_CATALOG` at a JSON file:
 
 ```json
 {
@@ -176,8 +176,8 @@ never be the reason a run starts costing money or sends privileged documents off
 the machine. Hosted models are reachable, but only by asking:
 
 ```sh
-uv run aneural-pipeline ingest doc.pdf --embedding text-embedding-3-large
-ANEURAL_TIER=small uv run aneural-pipeline machine    # force a tier
+uv run parnassix-pipeline ingest doc.pdf --embedding text-embedding-3-large
+PARNASSIX_TIER=small uv run parnassix-pipeline machine    # force a tier
 ```
 
 Because embedding dimension is baked into an index at creation, **the index name
@@ -185,7 +185,7 @@ contains the model identity**. Indexing one corpus under two models produces two
 coexisting indexes rather than one corrupt one, which is what makes this work:
 
 ```sh
-uv run aneural-pipeline compare "What is the liability cap?" samples/*.pdf
+uv run parnassix-pipeline compare "What is the liability cap?" samples/*.pdf
 ```
 
 Conversion is cached by content hash, so `compare` re-runs only the embedding
@@ -233,7 +233,7 @@ many `bbox`es, but a chunk can straddle a page break. Such a chunk produces
 
 Wire types are authored in Zod in `packages/report-schema`, emitted as JSON
 Schema, and generated into Pydantic here by `scripts/generate_models.py`
-(`src/aneural_pipeline/report/_generated.py`, gitignored — committing it would
+(`src/parnassix_pipeline/report/_generated.py`, gitignored — committing it would
 create a second copy of the contract that can drift). Turbo orders this app's
 build after the schema package, so the JSON being read is always current.
 
@@ -265,13 +265,13 @@ arrives carrying citations that make it look verified.
 
 | Command | Does |
 | --- | --- |
-| `aneural-pipeline machine` | Detected tier and the models it implies |
-| `aneural-pipeline models` | The catalogue, with dimensions and context windows |
-| `aneural-pipeline ingest PATHS` | Convert, chunk, embed, index. Reports provenance coverage |
-| `aneural-pipeline query Q` | Retrieve passages with citations resolved |
-| `aneural-pipeline compare Q PATHS` | Index under several models and compare |
-| `aneural-pipeline info` | Index state and the models that built it |
-| `aneural-pipeline serve` | HTTP API |
+| `parnassix-pipeline machine` | Detected tier and the models it implies |
+| `parnassix-pipeline models` | The catalogue, with dimensions and context windows |
+| `parnassix-pipeline ingest PATHS` | Convert, chunk, embed, index. Reports provenance coverage |
+| `parnassix-pipeline query Q` | Retrieve passages with citations resolved |
+| `parnassix-pipeline compare Q PATHS` | Index under several models and compare |
+| `parnassix-pipeline info` | Index state and the models that built it |
+| `parnassix-pipeline serve` | HTTP API |
 
 Useful flags: `--ocr` (scanned PDFs — off by default because it roughly triples
 conversion time; sparse output is detected and warned about instead),

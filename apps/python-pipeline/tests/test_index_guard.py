@@ -10,9 +10,9 @@ import json
 
 import pytest
 
-from aneural_pipeline.config import CorpusConfig, get_settings
-from aneural_pipeline.index import CorpusStore
-from aneural_pipeline.report import SCHEMA_VERSION
+from parnassix_pipeline.config import CorpusConfig, get_settings
+from parnassix_pipeline.index import CorpusStore
+from parnassix_pipeline.report import SCHEMA_VERSION
 
 
 @pytest.fixture
@@ -22,7 +22,7 @@ def redis_client():
     try:
         client.ping()
     except Exception:
-        pytest.skip("no Redis on ANEURAL_REDIS_URL")
+        pytest.skip("no Redis on PARNASSIX_REDIS_URL")
     return client
 
 

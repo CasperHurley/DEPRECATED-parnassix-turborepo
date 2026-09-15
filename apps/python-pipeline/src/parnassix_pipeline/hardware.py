@@ -148,7 +148,7 @@ def _cpu_brand() -> str:
 def detect_machine() -> Machine:
     """Inspect the host once per process.
 
-    ANEURAL_TIER overrides detection outright. That exists for CI and for the
+    PARNASSIX_TIER overrides detection outright. That exists for CI and for the
     case where someone wants a big machine to behave like a small one to
     reproduce a colleague's results — a tier that cannot be forced is a tier
     that makes results unreproducible across machines.
@@ -158,7 +158,7 @@ def detect_machine() -> Machine:
 
     cluster = detect_cluster()
 
-    forced = os.environ.get("ANEURAL_TIER")
+    forced = os.environ.get("PARNASSIX_TIER")
     if forced:
         tier = Tier(forced.lower())
     elif cluster is not None:
@@ -187,7 +187,7 @@ def detect_cluster() -> Cluster | None:
     exo exposes an OpenAI-compatible API, so a detected cluster is usable
     through the ordinary `openai-like` provider path — no special client.
 
-    Off unless `ANEURAL_EXO_BASE_URL` is set. Probing by default would mean a
+    Off unless `PARNASSIX_EXO_BASE_URL` is set. Probing by default would mean a
     blocking HTTP call on every process start, and — because exo's head node
     also listens on :8000 — a default probe of localhost:8000 could just as
     easily find THIS service's own API and misread it as a cluster.
@@ -196,7 +196,7 @@ def detect_cluster() -> Cluster | None:
     simply absent, and the machine falls back to its own memory tier rather
     than failing to start.
     """
-    base_url = os.environ.get("ANEURAL_EXO_BASE_URL")
+    base_url = os.environ.get("PARNASSIX_EXO_BASE_URL")
     if not base_url:
         return None
 

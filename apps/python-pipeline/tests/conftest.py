@@ -4,10 +4,10 @@ from pathlib import Path
 
 import pytest
 
-from aneural_pipeline.ingest import convert
+from parnassix_pipeline.ingest import convert
 
 SAMPLE = Path(__file__).resolve().parents[1] / "samples" / "sample-agreement.pdf"
-CACHE = Path(__file__).resolve().parents[1] / ".aneural-cache"
+CACHE = Path(__file__).resolve().parents[1] / ".parnassix-cache"
 
 
 @pytest.fixture(scope="session")

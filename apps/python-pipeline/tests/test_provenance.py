@@ -9,9 +9,9 @@ from __future__ import annotations
 import pytest
 from docling_core.types.doc import BoundingBox, CoordOrigin
 
-from aneural_pipeline.ingest import build_nodes, source_refs_of
-from aneural_pipeline.ingest.provenance import PageGeometry, _bbox_to_wire
-from aneural_pipeline.report import ContractError, validate_source_ref
+from parnassix_pipeline.ingest import build_nodes, source_refs_of
+from parnassix_pipeline.ingest.provenance import PageGeometry, _bbox_to_wire
+from parnassix_pipeline.report import ContractError, validate_source_ref
 
 
 def test_pages_are_captured_with_dimensions(converted):
@@ -51,7 +51,7 @@ def test_node_ids_change_when_text_changes(converted):
     rechunking — the citation still resolves, and now quotes something else.
     """
     nodes = build_nodes(converted)
-    from aneural_pipeline.ingest.provenance import stable_node_id
+    from parnassix_pipeline.ingest.provenance import stable_node_id
 
     class FakeChunk:
         text = "different text entirely"

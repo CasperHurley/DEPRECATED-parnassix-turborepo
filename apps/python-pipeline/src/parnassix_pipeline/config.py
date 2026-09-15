@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     """Process-wide configuration, from the environment or a .env file."""
 
     model_config = SettingsConfigDict(
-        env_prefix="ANEURAL_", env_file=".env", extra="ignore"
+        env_prefix="PARNASSIX_", env_file=".env", extra="ignore"
     )
 
     redis_url: str = "redis://localhost:6379"
@@ -53,7 +53,7 @@ class Settings(BaseSettings):
     # (layout models over every page); re-embedding the same corpus with a
     # different model should not pay it twice. This is what makes comparing
     # embedding models cheap enough to actually do.
-    cache_dir: Path = Path(".aneural-cache")
+    cache_dir: Path = Path(".parnassix-cache")
 
     # Semantic cache. The threshold is a DISTANCE, not a similarity: lower is a
     # tighter match. A cache that answers a question the user did not ask is
@@ -142,11 +142,11 @@ class CorpusConfig:
         incompatible vectors into an existing one — the failure mode becomes
         "the index is empty, reindex" rather than silently wrong search results.
         """
-        return f"aneural-{self.name}-{self.embedding.index_suffix}"
+        return f"parnassix-{self.name}-{self.embedding.index_suffix}"
 
     @property
     def cache_index_name(self) -> str:
-        return f"aneural-cache-{self.name}-{self.cache_embedding.index_suffix}"
+        return f"parnassix-cache-{self.name}-{self.cache_embedding.index_suffix}"
 
     def describe(self) -> str:
         return (

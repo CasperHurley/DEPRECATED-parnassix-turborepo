@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from aneural_pipeline.report import (
+from parnassix_pipeline.report import (
     SCHEMA_VERSION,
     ContractError,
     time_span_issues,

@@ -17,7 +17,7 @@ from pathlib import Path
 
 APP = Path(__file__).resolve().parents[1]
 SCHEMA = APP.parents[1] / "packages" / "report-schema" / "schema" / "report-schema.json"
-OUT = APP / "src" / "aneural_pipeline" / "report" / "_generated.py"
+OUT = APP / "src" / "parnassix_pipeline" / "report" / "_generated.py"
 
 BANNER = '''"""GENERATED FILE - DO NOT EDIT.
 

@@ -37,7 +37,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Aneural document pipeline",
+    title="Parnassix document pipeline",
     version=SCHEMA_VERSION,
     lifespan=lifespan,
 )

@@ -21,7 +21,7 @@ from .retrieval import CorpusRetriever
 
 app = typer.Typer(
     add_completion=False,
-    help="Aneural document pipeline: PDFs in, citable passages out.",
+    help="Parnassix document pipeline: PDFs in, citable passages out.",
 )
 console = Console()
 
@@ -62,12 +62,12 @@ def machine() -> None:
     console.print(CorpusConfig.build("<corpus>").describe())
     tiers = "|".join(t.value for t in Tier)
     console.print(
-        f"\n[dim]Override with ANEURAL_TIER={tiers}, or pass "
+        f"\n[dim]Override with PARNASSIX_TIER={tiers}, or pass "
         f"--embedding / --generation explicitly.[/dim]"
     )
     if m.cluster is None:
         console.print(
-            "[dim]Set ANEURAL_EXO_BASE_URL to use a pooled exo cluster for "
+            "[dim]Set PARNASSIX_EXO_BASE_URL to use a pooled exo cluster for "
             "generation.[/dim]"
         )
 
@@ -239,7 +239,7 @@ def serve(
 
     settings = get_settings()
     uvicorn.run(
-        "aneural_pipeline.api.app:app",
+        "parnassix_pipeline.api.app:app",
         host=host or settings.api_host,
         port=port or settings.api_port,
         reload=reload,

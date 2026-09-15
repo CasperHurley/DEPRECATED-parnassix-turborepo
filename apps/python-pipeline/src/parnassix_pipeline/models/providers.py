@@ -55,7 +55,7 @@ def build_embedding(model: EmbeddingModel, settings: Any) -> BaseEmbedding:
         if not base_url:
             raise ValueError(
                 f"{model.name} is an openai-compatible model with no base_url. Set one "
-                f"on the catalogue entry or via ANEURAL_OPENAI_COMPATIBLE_BASE_URL."
+                f"on the catalogue entry or via PARNASSIX_OPENAI_COMPATIBLE_BASE_URL."
             )
         # Such endpoints (exo, vLLM, a gateway) usually ignore the key but the
         # client insists on one being present.
@@ -93,7 +93,7 @@ def build_embedding(model: EmbeddingModel, settings: Any) -> BaseEmbedding:
 
         if not settings.openai_api_key:
             raise ValueError(
-                f"{model.name} is a hosted model and ANEURAL_OPENAI_API_KEY is unset. "
+                f"{model.name} is a hosted model and PARNASSIX_OPENAI_API_KEY is unset. "
                 f"Note that using it sends document text off this machine."
             )
         # api_base honours a gateway (TrustGate, LiteLLM) sitting in front of
@@ -140,7 +140,7 @@ def build_llm(model: GenerationModel, settings: Any, **kwargs: Any) -> LLM:
             raise ValueError(
                 f"{model.name} is an openai-compatible model with no base_url. For an "
                 f"exo cluster this is usually its head node, e.g. "
-                f"http://localhost:8000/v1 - set ANEURAL_OPENAI_COMPATIBLE_BASE_URL."
+                f"http://localhost:8000/v1 - set PARNASSIX_OPENAI_COMPATIBLE_BASE_URL."
             )
         return OpenAILike(
             model=model.name,
@@ -178,7 +178,7 @@ def build_llm(model: GenerationModel, settings: Any, **kwargs: Any) -> LLM:
             ) from exc
 
         if not settings.openai_api_key:
-            raise ValueError(f"{model.name} is hosted and ANEURAL_OPENAI_API_KEY is unset.")
+            raise ValueError(f"{model.name} is hosted and PARNASSIX_OPENAI_API_KEY is unset.")
         return OpenAI(
             model=model.name,
             api_key=settings.openai_api_key,

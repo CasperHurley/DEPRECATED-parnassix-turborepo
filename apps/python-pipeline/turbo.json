@@ -11,7 +11,7 @@
         "src/**",
         "../../packages/report-schema/schema/report-schema.json"
       ],
-      "outputs": ["src/aneural_pipeline/report/_generated.py"]
+      "outputs": ["src/parnassix_pipeline/report/_generated.py"]
     },
     "test": {
       "dependsOn": ["build"],

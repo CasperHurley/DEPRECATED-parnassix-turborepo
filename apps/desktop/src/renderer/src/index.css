@@ -15,3 +15,27 @@ body {
   display: flex;
   flex-direction: column;
 }
+
+/*
+ * macOS runs this window with titleBarStyle: 'hiddenInset' (see
+ * src/main/index.ts), which hands the renderer a full-size content area with
+ * the traffic lights floating over its top-left corner. Without this strip the
+ * first line of the report renders underneath them.
+ *
+ * Fixed rather than in-flow: the controls stay put while the report scrolls, so
+ * a strip that scrolled away would leave them over the content again. The
+ * background must track the window's, set in both body above and
+ * BrowserWindow's backgroundColor.
+ *
+ * -webkit-app-region: drag restores what the hidden title bar took away — a
+ * full-size content area is not draggable on its own.
+ */
+.titlebar-drag {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: #050505;
+  -webkit-app-region: drag;
+  z-index: 10;
+}

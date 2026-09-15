@@ -1,26 +1,43 @@
 # Parnassix
 
-A cross-platform monorepo: one shared Tamagui component layer rendered by a web app, a native iOS/Android app, and an Electron desktop app, with a NestJS API alongside them.
+Parnassix generates reports assembled from reusable, deterministic components. Component templates are fixed in shape; backend agents influence the output only by choosing enum values and supplying data. A hallucinating agent can produce wrong data, but it cannot produce a shape this repo doesn't know how to render.
+
+The primary use case is evidentiary work, legal being the sharpest example, so every fact shown must be traceable to its source. The failure to design against is the lawyer who cited a case that did not exist. This tool must never be able to do that: a model never sees or emits a page coordinate, only a node id, and the pipeline resolves that id back to a page, a bounding box, and a page size.
+
+This is the monorepo for the whole system: a shared Tamagui component layer rendered by a web app, a native iOS/Android app, and an Electron desktop app; a NestJS API; and the Python pipeline that turns documents into embeddings with per-fact provenance.
+
+## How the pieces fit
+
+| Piece                        | Where                                          | Status                                                                   |
+| ---------------------------- | ---------------------------------------------- | ------------------------------------------------------------------------ |
+| Wire contract                | `packages/report-schema`                       | Built. Zod is the source of truth; JSON Schema is emitted for Python.    |
+| Renderer                     | `packages/ui`                                  | Built. `ReportCanvas` validates each component and renders by `kind`.    |
+| Corpus ingestion + retrieval | `apps/python-pipeline`                         | Built. Docling → chunks → Redis vector index, with citation resolution.  |
+| Agent workflows              | `apps/python-pipeline`                         | Not built. Will populate component templates and retry on invalid enums. |
+| API gateway                  | `apps/api-client`                              | Scaffolded. Does not yet consume the contract or route to the pipeline.  |
+| Frontends                    | `apps/web-vite`, `apps/desktop`, `apps/native` | Built. All three render the same `@repo/ui` canvas.                      |
+
+`CLAUDE.md` holds the design decisions behind this table and the current state of each part in detail.
 
 ## What's inside
 
 ### Apps
 
-| App               | Stack                           | Purpose                                |
-| ----------------- | ------------------------------- | -------------------------------------- |
-| `apps/web-vite`   | Vite 8 + React 19               | Browser app                            |
-| `apps/native`     | Expo SDK 57 + React Native 0.86 | iOS, Android, and native-web via Metro |
-| `apps/desktop`    | Electron 44 + electron-vite 5   | macOS/Windows/Linux desktop app        |
-| `apps/api-client` | NestJS 12 on Fastify            | HTTP API                               |
+| App                    | Stack                              | Purpose                                      |
+| ---------------------- | ---------------------------------- | -------------------------------------------- |
+| `apps/web-vite`        | Vite 8 + React 19                  | Browser app                                  |
+| `apps/native`          | Expo SDK 57 + React Native 0.86    | iOS, Android, and native-web via Metro       |
+| `apps/desktop`         | Electron 44 + electron-vite 5      | macOS/Windows/Linux desktop app              |
+| `apps/api-client`      | NestJS 12 on Fastify               | HTTP API                                     |
 | `apps/python-pipeline` | Python 3.13 + Docling + LlamaIndex | Documents → embeddings + per-fact provenance |
 
 ### Packages
 
-| Package                                                  | Purpose                                                                                                                      |
-| -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `packages/ui` (`@repo/ui`)                               | The shared design system. Re-exports all of Tamagui plus the single shared `config`, built to CJS + ESM + types with `tsup`. |
-| `packages/report-schema` (`@repo/report-schema`)          | The wire contract between the agents and the renderer. Zod schemas are the source of truth; emits committed JSON Schema for the Python service to generate Pydantic models from. |
-| `packages/typescript-config` (`@repo/typescript-config`) | Shared `tsconfig.json` bases.                                                                                                |
+| Package                                                  | Purpose                                                                                                                                                                          |
+| -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/ui` (`@repo/ui`)                               | The shared design system and the `ReportCanvas` renderer. Re-exports all of Tamagui plus the single shared `config`, built to CJS + ESM + types with `tsup`.                     |
+| `packages/report-schema` (`@repo/report-schema`)         | The wire contract between the agents and the renderer. Zod schemas are the source of truth; emits committed JSON Schema for the Python service to generate Pydantic models from. |
+| `packages/typescript-config` (`@repo/typescript-config`) | Shared `tsconfig.json` bases.                                                                                                                                                    |
 
 The Python app is a full turbo citizen: a thin `package.json` maps `build`/`dev`/`lint`/`test`
 onto `uv`, and its build depends on `@repo/report-schema` so the Zod → JSON Schema → Pydantic
@@ -52,12 +69,16 @@ All three UI apps import from `@repo/ui`, so a component or theme token changes 
 
 **API** — NestJS 12 on the Fastify adapter, CORS enabled, listening on `PORT` (default 3000)
 
+**Contract** — [Zod](https://zod.dev) 4 in `@repo/report-schema`, emitted to JSON Schema and regenerated as Pydantic models by `datamodel-code-generator`
+
+**Pipeline** — Python 3.13, [Docling](https://github.com/docling-project/docling) for conversion and OCR, [LlamaIndex](https://www.llamaindex.ai) with Redis Stack as the vector store, [Ollama](https://ollama.com) for local embeddings, FastAPI for the HTTP surface
+
 **Tooling**
 
 - [TypeScript](https://www.typescriptlang.org) 6 everywhere
-- [oxlint](https://oxc.rs) — linting
-- [Vitest](https://vitest.dev) 4 — tests in `api-client`
-- [tsup](https://tsup.egoist.dev) — builds `@repo/ui`
+- [oxlint](https://oxc.rs) — linting; [ruff](https://docs.astral.sh/ruff/) for Python
+- [Vitest](https://vitest.dev) 4 — tests in `@repo/ui`, `@repo/report-schema`, and `api-client`; [pytest](https://docs.pytest.org) in the pipeline
+- [tsup](https://tsup.egoist.dev) — builds `@repo/ui` and `@repo/report-schema`
 - [Prettier](https://prettier.io) — formatting
 
 ## Getting started
@@ -92,19 +113,24 @@ pnpm ios                    # expo run:ios - full native build, generates ios/
 | ------------- | ---------------------------------------- |
 | `pnpm dev`    | All apps in watch mode (`turbo run dev`) |
 | `pnpm build`  | Build everything (`turbo run build`)     |
-| `pnpm lint`   | oxlint across the workspace              |
+| `pnpm test`   | Vitest and pytest across the workspace   |
+| `pnpm lint`   | oxlint and ruff across the workspace     |
 | `pnpm format` | Prettier over the repo                   |
 | `pnpm clean`  | Remove build output and `node_modules`   |
 
+`pnpm --filter @repo/report-schema check:schema` verifies the committed JSON Schema matches the Zod source; run it after changing the contract.
+
 ## Ports
 
-| Service            | Port                                           |
-| ------------------ | ---------------------------------------------- |
-| `web-vite`         | 5173                                           |
-| `desktop` renderer | 5173, or 5174 when `web-vite` already holds it |
-| `native` (Metro)   | 8081                                           |
-| `api-client`       | 3000                                           |
-| `python-pipeline`  | 8000 (Redis 6379, RedisInsight 8001)           |
+Web and desktop both pin their port with `strictPort`, so neither silently slides to the next free one.
+
+| Service            | Port                                 |
+| ------------------ | ------------------------------------ |
+| `web-vite`         | 5173                                 |
+| `desktop` renderer | 5174                                 |
+| `native` (Metro)   | 8081                                 |
+| `api-client`       | 3000                                 |
+| `python-pipeline`  | 8000 (Redis 6379, RedisInsight 8001) |
 
 ## Workspace constraints
 

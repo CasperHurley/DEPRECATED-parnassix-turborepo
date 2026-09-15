@@ -17,16 +17,32 @@ Two things live here and they are deliberately separate:
 
 from __future__ import annotations
 
+import json
+import logging
+import os
 from dataclasses import dataclass
 from enum import StrEnum
+from pathlib import Path
 
 from ..hardware import Tier, detect_machine
+
+log = logging.getLogger(__name__)
 
 
 class Provider(StrEnum):
     OLLAMA = "ollama"
     HUGGINGFACE = "huggingface"
     OPENAI = "openai"
+    BEDROCK = "bedrock"
+    """AWS Bedrock. Hosted, but inside the customer's own AWS account and
+    region, which is a materially different privacy posture from a public API
+    key — often the only acceptable hosted option for privileged documents."""
+
+    OPENAI_COMPATIBLE = "openai-compatible"
+    """Anything speaking the OpenAI wire format at a custom base URL: an exo
+    cluster, vLLM, LM Studio, or an AI gateway such as TrustGate sitting in
+    front of a real provider. One provider entry covers all of them because the
+    protocol, not the vendor, is what the client needs to know."""
 
 
 class Role(StrEnum):
@@ -67,8 +83,19 @@ class EmbeddingModel:
 
     notes: str = ""
 
+    base_url: str | None = None
+    """Endpoint override, for OPENAI_COMPATIBLE and for a gateway in front of a
+    provider. None means the provider's own default from Settings."""
+
     @property
     def is_local(self) -> bool:
+        """Whether inference happens on hardware the operator controls.
+
+        OPENAI_COMPATIBLE is NOT counted as local even though it usually is
+        (exo, vLLM on your own box): the base URL could equally be a hosted
+        gateway, and this property gates whether a model may be a TIER DEFAULT.
+        Guessing "probably local" there would let a default send documents off
+        the machine, which is the one thing tier defaults must never do."""
         return self.provider in (Provider.OLLAMA, Provider.HUGGINGFACE)
 
     @property
@@ -87,6 +114,7 @@ class GenerationModel:
     name: str
     provider: Provider
     context_window: int
+    base_url: str | None = None
     notes: str = ""
 
     @property
@@ -139,6 +167,24 @@ EMBEDDING_MODELS: dict[str, EmbeddingModel] = {
         max_tokens=8191,
         notes="Hosted, highest quality, most expensive per token.",
     ),
+    # AWS Bedrock, via the `bedrock` extra. Hosted, but within the customer's own
+    # AWS account - the usual answer when a client will not run local models but
+    # also will not send documents to a public API.
+    "amazon.titan-embed-text-v2:0": EmbeddingModel(
+        name="amazon.titan-embed-text-v2:0",
+        provider=Provider.BEDROCK,
+        dimension=1024,
+        max_tokens=8192,
+        notes="Bedrock Titan v2. Dimension is configurable upstream (256/512/1024); "
+        "this entry pins 1024 because an index cannot change its mind later.",
+    ),
+    "cohere.embed-english-v3": EmbeddingModel(
+        name="cohere.embed-english-v3",
+        provider=Provider.BEDROCK,
+        dimension=1024,
+        max_tokens=512,
+        notes="Bedrock Cohere v3. 512-token window - short for Docling chunks.",
+    ),
     # Local sentence-transformers, via the `huggingface` extra. No daemon needed.
     "BAAI/bge-small-en-v1.5": EmbeddingModel(
         name="BAAI/bge-small-en-v1.5",
@@ -162,6 +208,25 @@ GENERATION_MODELS: dict[str, GenerationModel] = {
         provider=Provider.OLLAMA,
         context_window=131072,
         notes="~4.9 GB resident. The modest-machine local option.",
+    ),
+    "llama3.3:70b": GenerationModel(
+        name="llama3.3:70b",
+        provider=Provider.OLLAMA,
+        context_window=131072,
+        notes="~43 GB resident. Needs 64 GB+ to run without swapping.",
+    ),
+    "exo-cluster": GenerationModel(
+        name="exo-cluster",
+        provider=Provider.OPENAI_COMPATIBLE,
+        context_window=131072,
+        notes="Whatever the exo cluster has loaded, reached over its "
+        "OpenAI-compatible API. Model identity is the cluster's to decide.",
+    ),
+    "claude-sonnet-4-5-bedrock": GenerationModel(
+        name="anthropic.claude-sonnet-4-5-20250929-v1:0",
+        provider=Provider.BEDROCK,
+        context_window=200000,
+        notes="Bedrock, in the customer's own AWS account and region.",
     ),
     "gpt-4o-mini": GenerationModel(
         name="gpt-4o-mini",
@@ -193,7 +258,105 @@ _TIER_DEFAULTS: dict[Tier, dict[Role, str]] = {
         Role.CACHE: "nomic-embed-text",
         Role.GENERATION: "qwen2.5:32b",
     },
+    # Embedding does not get better by throwing memory at it - bge-m3 is already
+    # the best local option in the catalogue, so the richer tiers spend their
+    # headroom on GENERATION, which is where it actually buys accuracy.
+    Tier.XLARGE: {
+        Role.CORPUS: "bge-m3",
+        Role.CACHE: "nomic-embed-text",
+        Role.GENERATION: "llama3.3:70b",
+    },
+    Tier.WORKSTATION: {
+        Role.CORPUS: "bge-m3",
+        Role.CACHE: "nomic-embed-text",
+        Role.GENERATION: "llama3.3:70b",
+    },
+    # A cluster pools memory for GENERATION only. Embedding stays on this
+    # machine: it is a throughput-bound batch job over many small inputs, and
+    # shipping every chunk across a network to a pooled model would be slower
+    # than running a 567M-parameter model locally, not faster.
+    Tier.CLUSTER: {
+        Role.CORPUS: "bge-m3",
+        Role.CACHE: "nomic-embed-text",
+        Role.GENERATION: "exo-cluster",
+    },
 }
+
+
+def load_catalog_overrides(path: str | Path | None = None) -> int:
+    """Merge a user-supplied model catalogue over the built-in one.
+
+    The built-in catalogue cannot know about a model released next month, a
+    private fine-tune, or an internal endpoint. Rather than force a code change
+    for each, point `ANEURAL_MODEL_CATALOG` at a JSON file:
+
+        {
+          "embedding": {
+            "my-finetune": {
+              "provider": "openai-compatible",
+              "dimension": 1024,
+              "max_tokens": 8192,
+              "base_url": "http://gpu-rig:8000/v1",
+              "hf_tokenizer": "BAAI/bge-m3"
+            }
+          },
+          "generation": {
+            "my-llm": {"provider": "ollama", "context_window": 32768}
+          }
+        }
+
+    `dimension` is mandatory for an embedding entry and is NOT defaulted. It is
+    the one field that cannot be guessed: a wrong value builds an index that
+    accepts writes and fails at query time, long after the run that caused it.
+
+    Overrides may replace built-in entries by name, which is the supported way
+    to repoint a tag at a different endpoint without editing this file.
+    """
+    raw = path or os.environ.get("ANEURAL_MODEL_CATALOG")
+    if not raw:
+        return 0
+    catalog_path = Path(raw)
+    if not catalog_path.is_file():
+        raise FileNotFoundError(
+            f"ANEURAL_MODEL_CATALOG points at {catalog_path}, which does not exist"
+        )
+
+    data = json.loads(catalog_path.read_text())
+    count = 0
+
+    for name, spec in (data.get("embedding") or {}).items():
+        missing = {"provider", "dimension"} - spec.keys()
+        if missing:
+            raise ValueError(
+                f"embedding model {name!r} in {catalog_path} is missing {sorted(missing)}. "
+                f"'dimension' in particular cannot be inferred - a wrong one builds an "
+                f"index that only fails at query time."
+            )
+        EMBEDDING_MODELS[name] = EmbeddingModel(
+            name=spec.get("model_name", name),
+            provider=Provider(spec["provider"]),
+            dimension=int(spec["dimension"]),
+            max_tokens=int(spec.get("max_tokens", 512)),
+            hf_tokenizer=spec.get("hf_tokenizer"),
+            base_url=spec.get("base_url"),
+            notes=spec.get("notes", f"user-defined ({catalog_path.name})"),
+        )
+        count += 1
+
+    for name, spec in (data.get("generation") or {}).items():
+        if "provider" not in spec:
+            raise ValueError(f"generation model {name!r} in {catalog_path} is missing 'provider'")
+        GENERATION_MODELS[name] = GenerationModel(
+            name=spec.get("model_name", name),
+            provider=Provider(spec["provider"]),
+            context_window=int(spec.get("context_window", 8192)),
+            base_url=spec.get("base_url"),
+            notes=spec.get("notes", f"user-defined ({catalog_path.name})"),
+        )
+        count += 1
+
+    log.info("loaded %d model override(s) from %s", count, catalog_path)
+    return count
 
 
 def resolve_embedding_model(name: str) -> EmbeddingModel:
@@ -203,6 +366,7 @@ def resolve_embedding_model(name: str) -> EmbeddingModel:
     is where `dimension` comes from, and a guessed dimension builds an index
     that is wrong in a way nothing detects until query time.
     """
+    load_catalog_overrides()
     try:
         return EMBEDDING_MODELS[name]
     except KeyError:

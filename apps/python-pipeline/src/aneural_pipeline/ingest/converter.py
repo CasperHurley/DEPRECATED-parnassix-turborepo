@@ -10,7 +10,9 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import platform
 from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
 
 from docling.datamodel.base_models import InputFormat
@@ -30,6 +32,51 @@ log = logging.getLogger(__name__)
 _SPARSE_TEXT_CHARS_PER_PAGE = 100
 
 
+class OcrEngineChoice(StrEnum):
+    """Which OCR engine to use on image content.
+
+    Engine choice is not a performance knob, it is an accuracy one, and the
+    spread is large. Measured on a rasterized copy of the sample agreement:
+
+        auto (RapidOCR)   "Eit   tn  (or t  n  y ts t r t the other party."
+        ocrmac (Vision)   "Either party may terminate this Agreement for
+                           convenience upon thirty (30) days written notice
+                           to the other party."
+
+    Same page, same pipeline. The first is unusable as evidence and would be
+    embedded, retrieved and quoted as if it were fine — a citation pointing at
+    a real region of a real page, containing text the document does not say.
+    """
+
+    AUTO = "auto"
+    """Docling picks from what is installed. Prefer NATIVE below on macOS."""
+
+    NATIVE = "native"
+    """Apple's Vision framework via `ocrmac`. macOS only, no model download,
+    and the only engine here with real handwriting support. Needs the `ocrmac`
+    extra."""
+
+    RAPID = "rapid"
+    EASY = "easy"
+    TESSERACT = "tesseract"
+
+
+def _default_ocr_engine() -> OcrEngineChoice:
+    """Prefer Apple Vision on macOS, because it is markedly better there.
+
+    Falls back to AUTO elsewhere, or when `ocrmac` is not installed, so this is
+    a preference rather than a requirement.
+    """
+    if platform.system() == "Darwin":
+        try:
+            import ocrmac  # noqa: F401
+
+            return OcrEngineChoice.NATIVE
+        except ImportError:
+            log.debug("ocrmac not installed; falling back to auto OCR engine")
+    return OcrEngineChoice.AUTO
+
+
 @dataclass(frozen=True)
 class ConversionOptions:
     """What to ask Docling for.
@@ -37,20 +84,80 @@ class ConversionOptions:
     `ocr` is off by default because it roughly triples conversion time and does
     nothing for the digital PDFs that dominate most corpora. It is not off
     because scanned documents are rare — they are not, in evidentiary work — so
-    sparse output is detected and reported rather than passed over silently.
+    a document that converts to nothing is reported loudly rather than passed
+    over (see `_warn_if_sparse`, and the `empty_documents` list on IngestReport).
     """
 
     ocr: bool = False
+    ocr_engine: OcrEngineChoice | None = None
+    """None means `_default_ocr_engine()`, chosen when the converter is built."""
+
+    force_full_page_ocr: bool = False
+    """OCR the whole page rather than only regions layout analysis marked as
+    images. Needed when a scan carries a junk text layer — a common output of
+    cheap scanning software — which otherwise suppresses OCR on text that is
+    really a picture of text."""
+
     table_structure: bool = True
 
+    def resolved_engine(self) -> OcrEngineChoice:
+        return self.ocr_engine or _default_ocr_engine()
+
     def fingerprint(self) -> str:
-        return f"ocr={int(self.ocr)},tables={int(self.table_structure)}"
+        # Part of the conversion cache key, so changing the engine correctly
+        # invalidates a cached conversion made with a worse one.
+        engine = self.resolved_engine().value if self.ocr else "off"
+        return (
+            f"ocr={engine},full_page={int(self.force_full_page_ocr)},"
+            f"tables={int(self.table_structure)}"
+        )
+
+
+def _ocr_options(options: ConversionOptions):
+    """Build docling's OCR options for the chosen engine.
+
+    An explicitly requested engine that is not installed raises rather than
+    silently degrading: someone who asked for Vision and got RapidOCR would get
+    the mangled transcription above and no indication why.
+    """
+    from docling.datamodel.pipeline_options import (
+        EasyOcrOptions,
+        OcrAutoOptions,
+        OcrMacOptions,
+        OcrMode,
+        RapidOcrOptions,
+        TesseractOcrOptions,
+    )
+
+    engine = options.resolved_engine()
+    mode = OcrMode.FULL_PAGE if options.force_full_page_ocr else OcrMode.DEFAULT
+
+    if engine is OcrEngineChoice.NATIVE:
+        try:
+            import ocrmac  # noqa: F401
+        except ImportError as exc:
+            raise ImportError(
+                "OCR engine 'native' needs Apple's Vision bindings: "
+                "uv sync --extra ocrmac (macOS only)."
+            ) from exc
+        # "accurate" over "fast": this is evidence, and the cost is seconds.
+        return OcrMacOptions(recognition="accurate")
+
+    if engine is OcrEngineChoice.RAPID:
+        return RapidOcrOptions(mode=mode)
+    if engine is OcrEngineChoice.EASY:
+        return EasyOcrOptions()
+    if engine is OcrEngineChoice.TESSERACT:
+        return TesseractOcrOptions()
+    return OcrAutoOptions(mode=mode)
 
 
 def _converter(options: ConversionOptions) -> DocumentConverter:
     pipeline_options = PdfPipelineOptions()
     pipeline_options.do_ocr = options.ocr
     pipeline_options.do_table_structure = options.table_structure
+    if options.ocr:
+        pipeline_options.ocr_options = _ocr_options(options)
     return DocumentConverter(
         format_options={
             InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)

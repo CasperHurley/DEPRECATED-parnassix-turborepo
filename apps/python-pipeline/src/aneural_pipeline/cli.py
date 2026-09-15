@@ -12,9 +12,9 @@ from rich.console import Console
 from rich.table import Table
 
 from .config import CorpusConfig, get_settings
-from .hardware import detect_machine
+from .hardware import Tier, detect_machine
 from .index import CorpusStore
-from .ingest import ConversionOptions, ingest
+from .ingest import ConversionOptions, OcrEngineChoice, ingest
 from .models import EMBEDDING_MODELS, GENERATION_MODELS
 from .report import SCHEMA_VERSION
 from .retrieval import CorpusRetriever
@@ -56,12 +56,20 @@ def machine() -> None:
     """Show what this machine was detected as, and what it will pick."""
     m = detect_machine()
     console.print(f"[bold]{m.describe()}[/bold]")
-    config = CorpusConfig.build("example")
-    console.print(config.describe())
+    # A throwaway corpus name, only so `describe()` has something to render. The
+    # models and the tier are the real output; the name and the index line just
+    # show the SHAPE an index name takes for a corpus called <name>.
+    console.print(CorpusConfig.build("<corpus>").describe())
+    tiers = "|".join(t.value for t in Tier)
     console.print(
-        "\n[dim]Override with ANEURAL_TIER=small|medium|large, or pass "
-        "--embedding / --generation explicitly.[/dim]"
+        f"\n[dim]Override with ANEURAL_TIER={tiers}, or pass "
+        f"--embedding / --generation explicitly.[/dim]"
     )
+    if m.cluster is None:
+        console.print(
+            "[dim]Set ANEURAL_EXO_BASE_URL to use a pooled exo cluster for "
+            "generation.[/dim]"
+        )
 
 
 @app.command(name="models")
@@ -92,6 +100,14 @@ def ingest_command(
     generation: Annotated[str | None, typer.Option(help="Generation model")] = None,
     cache: Annotated[str | None, typer.Option(help="Cache embedding model")] = None,
     ocr: Annotated[bool, typer.Option(help="Run OCR (needed for scanned PDFs)")] = False,
+    ocr_engine: Annotated[
+        OcrEngineChoice | None,
+        typer.Option(help="OCR engine. Default prefers Apple Vision on macOS."),
+    ] = None,
+    full_page_ocr: Annotated[
+        bool,
+        typer.Option(help="OCR whole pages, for scans carrying a junk text layer"),
+    ] = False,
     overwrite: Annotated[bool, typer.Option(help="Drop the index first")] = False,
     raw_coords: Annotated[
         bool,
@@ -112,7 +128,9 @@ def ingest_command(
         config,
         get_settings(),
         SCHEMA_VERSION,
-        conversion=ConversionOptions(ocr=ocr),
+        conversion=ConversionOptions(
+            ocr=ocr, ocr_engine=ocr_engine, force_full_page_ocr=full_page_ocr
+        ),
         overwrite=overwrite,
         to_topleft=not raw_coords,
     )
@@ -122,6 +140,17 @@ def ingest_command(
         f"{len(report.documents)} document(s), {report.pages} pages "
         f"in {report.seconds:.1f}s"
     )
+
+    for empty in report.empty_documents:
+        console.print(
+            f"[yellow]no text:[/yellow] {Path(empty).name} "
+            f"— converted but produced nothing. If scanned, re-run with --ocr."
+        )
+    for failure in report.failures:
+        console.print(
+            f"[red]FAILED:[/red] {Path(failure.path).name} "
+            f"({failure.error_type}) {failure.error}"
+        )
     coverage = report.provenance_coverage
     style = "green" if coverage == 1.0 else "yellow"
     console.print(
@@ -132,6 +161,14 @@ def ingest_command(
             else ""
         )
     )
+
+    if not report.ok:
+        # Non-zero exit, so a batch run in a script or CI cannot report success
+        # while having quietly skipped documents. This is the whole point of
+        # collecting failures rather than raising on the first one: finish the
+        # work, then refuse to call a partial run a complete one.
+        console.print(f"\n[red]incomplete:[/red] {report.summary()}")
+        raise typer.Exit(code=1)
 
 
 @app.command()

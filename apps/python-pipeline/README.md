@@ -39,6 +39,60 @@ uv run aneural-pipeline serve                                   # HTTP on :8000
 
 Ollama must be running, with an embedding model pulled (`ollama pull bge-m3`).
 
+## Scanned and handwritten documents
+
+**OCR engine choice is an accuracy decision, not a performance one**, and the
+spread is not subtle. Measured on a rasterized copy of the sample agreement:
+
+| Engine | Output |
+| --- | --- |
+| auto (RapidOCR) | `"Eit   tn  (or t  n  y ts t r t the other party."` |
+| `native` (Apple Vision) | `"Either party may terminate this Agreement for convenience upon thirty (30) days written notice to the other party."` |
+
+Same page, same pipeline. The first is unusable as evidence — and it would be
+embedded, retrieved and quoted with a *correct* citation attached, pointing at a
+real region of a real page containing text the document does not say.
+
+So on macOS the default engine is `native` (Apple's Vision framework, via the
+`ocrmac` extra), which also has the best handwriting support of the traditional
+engines. Bounding boxes survive OCR intact, so scanned pages are citable exactly
+like digital ones.
+
+```sh
+uv sync --extra ocrmac
+uv run aneural-pipeline ingest scan.pdf --ocr                    # picks native on macOS
+uv run aneural-pipeline ingest scan.pdf --ocr --full-page-ocr    # scans with a junk text layer
+uv run aneural-pipeline ingest scan.pdf --ocr --ocr-engine tesseract
+```
+
+`--full-page-ocr` matters more than it sounds: cheap scanning software often
+emits a garbage text layer, which makes layout analysis treat a picture of text
+as text and skip OCR on it entirely.
+
+**For difficult handwriting**, traditional OCR is the wrong tool and Docling
+ships a VLM pipeline instead — `granite-docling`, `nanonets-ocr2`, `glm-ocr`,
+several with **MLX builds** that run natively on Apple Silicon. That path is not
+wired up here yet; it is materially slower and needs its own provenance
+verification, since a VLM emits layout tokens rather than reading boxes off the
+page.
+
+**A document that OCR cannot read is never silently dropped.** It converts
+without raising and produces nothing, which is why `IngestReport` tracks
+`empty_documents` separately from failures and the CLI exits non-zero.
+
+## Nothing is skipped quietly
+
+A run over a thousand documents will meet a corrupt file, a password-protected
+one, and a provider whose extra is not installed. One bad document does not lose
+the batch: failures are collected per document and re-reported at the end.
+
+- `report.failures` — documents that raised, with the exception type
+- `report.empty_documents` — converted fine, produced no text (the scanned-PDF
+  signature)
+- `report.ok` — true only if every document attempted actually landed
+- the CLI **exits 1** on a partial run, so a script cannot report success having
+  skipped documents
+
 ## Model selection is per corpus, and by machine
 
 `aneural-pipeline machine` detects total memory and picks a **tier**, and the
@@ -50,7 +104,68 @@ happens on every request, and generation is where hosted tokens get expensive.
 | --- | --- | --- | --- | --- |
 | small | < 16 GB | `bge-small-en-v1.5` (384d) | `bge-small-en-v1.5` | `llama3.1` |
 | medium | 16–32 GB | `nomic-embed-text` (768d) | `nomic-embed-text` | `llama3.1` |
-| large | ≥ 32 GB | `bge-m3` (1024d) | `nomic-embed-text` (768d) | `qwen2.5:32b` |
+| large | 32–64 GB | `bge-m3` (1024d) | `nomic-embed-text` (768d) | `qwen2.5:32b` |
+| xlarge | 64–128 GB | `bge-m3` | `nomic-embed-text` | `llama3.3:70b` |
+| workstation | ≥ 128 GB | `bge-m3` | `nomic-embed-text` | `llama3.3:70b` |
+| cluster | pooled (exo) | `bge-m3` *(local)* | `nomic-embed-text` *(local)* | the cluster |
+
+The richer tiers spend their headroom on **generation**, not embedding: `bge-m3`
+is already the best local embedding model in the catalogue, so a 256 GB machine
+has nothing better to run for that role.
+
+### Pooling machines with exo
+
+[exo](https://github.com/exo-explore/exo) pools several Apple Silicon machines
+over Thunderbolt and exposes an OpenAI-compatible API, so a cluster is reachable
+through the ordinary `openai-compatible` provider — no special client:
+
+```sh
+export ANEURAL_EXO_BASE_URL=http://localhost:8000/v1
+uv run aneural-pipeline machine     # reports the cluster, tier becomes `cluster`
+```
+
+Two deliberate choices. Detection is **opt-in** rather than probed by default:
+exo's head node also listens on :8000, so a default localhost probe could find
+*this service's own API* and misread it as a cluster. And a cluster is used for
+**generation only** — embedding stays local, because it is a throughput-bound
+batch over many small inputs where shipping every chunk across a network costs
+more than running a 567M-parameter model on the machine you are already on.
+
+## Providers
+
+| Provider | Use |
+| --- | --- |
+| `ollama` | Local daemon. The default everywhere. |
+| `huggingface` | Local, in-process (`--extra huggingface`). Runs in CI. |
+| `openai` | Hosted. Honours `ANEURAL_OPENAI_BASE_URL`, so a gateway can sit in front. |
+| `bedrock` | AWS Bedrock (`--extra bedrock`). Hosted, but in the customer's own account and region — often the only acceptable hosted option for privileged documents. Credentials come from the standard AWS chain. |
+| `openai-compatible` | Any OpenAI-wire endpoint (`--extra compatible`): exo, vLLM, LM Studio, or an AI gateway. |
+
+### Bringing your own models
+
+The built-in catalogue cannot know about a model released next month or a
+private fine-tune. Point `ANEURAL_MODEL_CATALOG` at a JSON file:
+
+```json
+{
+  "embedding": {
+    "my-finetune": {
+      "provider": "openai-compatible",
+      "dimension": 1024,
+      "max_tokens": 8192,
+      "base_url": "http://gpu-rig:8000/v1",
+      "hf_tokenizer": "BAAI/bge-m3"
+    }
+  },
+  "generation": { "my-llm": { "provider": "ollama", "context_window": 32768 } }
+}
+```
+
+Overrides may replace built-in entries by name. `dimension` is **mandatory and
+never defaulted** — it is the one field that cannot be guessed, because a wrong
+value builds an index that accepts every write and fails only at query time. A
+catalogue file that is configured but missing is an error, not a shrug: silently
+ignoring it would run a whole corpus on the wrong models.
 
 Note the large tier deliberately does **not** use `bge-m3` for the cache: the
 cache embeds one short query per request and its vectors are never compared

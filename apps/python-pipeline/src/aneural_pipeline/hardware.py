@@ -11,12 +11,15 @@ choice is recorded in index metadata, so nothing downstream has to re-derive it.
 
 from __future__ import annotations
 
+import logging
 import os
 import platform
 import subprocess
 from dataclasses import dataclass
 from enum import StrEnum
 from functools import lru_cache
+
+log = logging.getLogger(__name__)
 
 
 class Tier(StrEnum):
@@ -26,11 +29,50 @@ class Tier(StrEnum):
     constraint for local inference on the machines this runs on. They are
     deliberately conservative: the tier a machine gets should leave room for the
     editor, the browser, and the rest of the monorepo's dev servers.
+
+    The ladder runs past LARGE because the hardware does. A 64 GB laptop, a
+    256 GB Mac Studio and a pair of machines pooled over Thunderbolt are three
+    genuinely different capability classes, and collapsing them into ">= 32 GB"
+    means a workstation runs the same 30B model a laptop does — leaving most of
+    the machine idle for no reason.
     """
 
-    SMALL = "small"  # < 16 GB — keep local models tiny, prefer hosted for generation
+    SMALL = "small"  # < 16 GB — keep local models tiny
     MEDIUM = "medium"  # 16–32 GB — local embeddings comfortably, mid-size local LLM
-    LARGE = "large"  # >= 32 GB — large local embeddings and a 30B-class local LLM
+    LARGE = "large"  # 32–64 GB — large local embeddings, 30B-class local LLM
+    XLARGE = "xlarge"  # 64–128 GB — 70B-class comfortably
+    WORKSTATION = "workstation"  # >= 128 GB — Mac Studio / Ultra territory
+    CLUSTER = "cluster"  # pooled memory across machines (exo). See detect_cluster().
+
+
+# Lower bound of each tier in GB, richest first. Read by `_tier_for`.
+_TIER_FLOOR: list[tuple[Tier, float]] = [
+    (Tier.WORKSTATION, 128),
+    (Tier.XLARGE, 64),
+    (Tier.LARGE, 32),
+    (Tier.MEDIUM, 16),
+    (Tier.SMALL, 0),
+]
+
+
+def _tier_for(memory_gb: float) -> Tier:
+    for tier, floor in _TIER_FLOOR:
+        if memory_gb >= floor:
+            return tier
+    return Tier.SMALL
+
+
+@dataclass(frozen=True)
+class Cluster:
+    """A detected exo cluster: several machines pooling memory for inference."""
+
+    base_url: str
+    node_count: int
+    pooled_memory_gb: float | None
+
+    def describe(self) -> str:
+        pooled = f"{self.pooled_memory_gb:.0f} GB pooled" if self.pooled_memory_gb else "pooled"
+        return f"exo cluster at {self.base_url}: {self.node_count} node(s), {pooled}"
 
 
 @dataclass(frozen=True)
@@ -42,11 +84,21 @@ class Machine:
     cpu: str
     arch: str
     apple_silicon: bool
+    cluster: Cluster | None = None
+
+    @property
+    def usable_memory_gb(self) -> float:
+        """Memory available for inference, pooled across a cluster when present."""
+        if self.cluster and self.cluster.pooled_memory_gb:
+            return self.cluster.pooled_memory_gb
+        return self.total_memory_gb
 
     def describe(self) -> str:
-        return (
-            f"{self.cpu} ({self.arch}), {self.total_memory_gb:.0f} GB — tier {self.tier.value}"
+        base = (
+            f"{self.cpu} ({self.arch}), {self.total_memory_gb:.0f} GB — "
+            f"tier {self.tier.value}"
         )
+        return f"{base}\n{self.cluster.describe()}" if self.cluster else base
 
 
 def _total_memory_bytes() -> int | None:
@@ -104,15 +156,18 @@ def detect_machine() -> Machine:
     memory_bytes = _total_memory_bytes()
     memory_gb = (memory_bytes / 1024**3) if memory_bytes else 8.0
 
+    cluster = detect_cluster()
+
     forced = os.environ.get("ANEURAL_TIER")
     if forced:
         tier = Tier(forced.lower())
-    elif memory_gb >= 32:
-        tier = Tier.LARGE
-    elif memory_gb >= 16:
-        tier = Tier.MEDIUM
+    elif cluster is not None:
+        # A cluster is its own tier rather than a bigger number, because what
+        # changes is not only capacity but WHERE inference runs: generation goes
+        # to the cluster endpoint while embedding stays local (see the registry).
+        tier = Tier.CLUSTER
     else:
-        tier = Tier.SMALL
+        tier = _tier_for(memory_gb)
 
     arch = platform.machine()
     return Machine(
@@ -121,4 +176,53 @@ def detect_machine() -> Machine:
         cpu=_cpu_brand(),
         arch=arch,
         apple_silicon=platform.system() == "Darwin" and arch == "arm64",
+        cluster=cluster,
+    )
+
+
+@lru_cache(maxsize=1)
+def detect_cluster() -> Cluster | None:
+    """Probe for an exo cluster pooling several machines' memory.
+
+    exo exposes an OpenAI-compatible API, so a detected cluster is usable
+    through the ordinary `openai-like` provider path — no special client.
+
+    Off unless `ANEURAL_EXO_BASE_URL` is set. Probing by default would mean a
+    blocking HTTP call on every process start, and — because exo's head node
+    also listens on :8000 — a default probe of localhost:8000 could just as
+    easily find THIS service's own API and misread it as a cluster.
+
+    Detection is best-effort by design: a cluster that cannot be reached is
+    simply absent, and the machine falls back to its own memory tier rather
+    than failing to start.
+    """
+    base_url = os.environ.get("ANEURAL_EXO_BASE_URL")
+    if not base_url:
+        return None
+
+    import json
+    import urllib.error
+    import urllib.request
+
+    base_url = base_url.rstrip("/")
+    try:
+        with urllib.request.urlopen(f"{base_url}/models", timeout=2.0) as response:
+            payload = json.loads(response.read())
+    except (urllib.error.URLError, TimeoutError, ValueError, OSError) as exc:
+        log.warning("no exo cluster at %s (%s); using this machine only", base_url, exc)
+        return None
+
+    # exo's topology fields have moved between releases, so read defensively and
+    # report what is certain (the endpoint works) rather than guessing capacity.
+    nodes = payload.get("topology") or payload.get("nodes") or []
+    node_count = len(nodes) if isinstance(nodes, list) else 1
+    pooled = None
+    if isinstance(nodes, list):
+        total = sum(
+            n.get("memory_gb", 0) or 0 for n in nodes if isinstance(n, dict)
+        )
+        pooled = float(total) or None
+
+    return Cluster(
+        base_url=base_url, node_count=max(node_count, 1), pooled_memory_gb=pooled
     )

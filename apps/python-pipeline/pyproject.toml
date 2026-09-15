@@ -30,11 +30,26 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# Apple's Vision framework. macOS only, no model download, and by a wide margin
+# the best OCR available here - including the only real handwriting support.
+ocrmac = ["ocrmac>=1.0.0"]
+bedrock = [
+    "llama-index-embeddings-bedrock>=0.9.0",
+    "llama-index-llms-bedrock-converse>=0.15.0",
+]
+# Any OpenAI-wire-format endpoint: an exo cluster, vLLM, LM Studio, or a gateway.
+compatible = [
+    "llama-index-embeddings-openai-like>=0.4.0",
+    "llama-index-llms-openai-like>=0.8.0",
+]
 # Kept out of the default install: sentence-transformers drags in its own torch
 # stack, and the Ollama path is the default. Install when comparing providers.
 huggingface = ["llama-index-embeddings-huggingface>=0.8.0"]
+# Lower bound kept at 0.6 deliberately: llama-index-embeddings-openai-like (the
+# `compatible` extra) pins <0.7, and the two extras have to be installable
+# together - a gateway in front of OpenAI needs both.
 openai = [
-    "llama-index-embeddings-openai>=0.7.0",
+    "llama-index-embeddings-openai>=0.6.0",
     "llama-index-llms-openai>=0.6.0",
 ]
 

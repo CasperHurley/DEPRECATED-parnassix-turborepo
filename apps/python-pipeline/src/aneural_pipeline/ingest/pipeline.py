@@ -20,6 +20,22 @@ log = logging.getLogger(__name__)
 
 
 @dataclass
+class FailedDocument:
+    """One document that did not make it into the index, and why.
+
+    Kept as structured data rather than only logged, because a log line scrolls
+    past in a thousand-document run and a caller cannot branch on it.
+    """
+
+    path: str
+    error: str
+    error_type: str
+
+    def as_dict(self) -> dict[str, str]:
+        return {"path": self.path, "errorType": self.error_type, "error": self.error}
+
+
+@dataclass
 class IngestReport:
     """What an ingestion run did. Returned rather than printed, so the CLI, the
     API and the tests can each present it their own way."""
@@ -28,10 +44,21 @@ class IngestReport:
     index_name: str
     embedding_model: str
     documents: list[str] = field(default_factory=list)
+    failures: list[FailedDocument] = field(default_factory=list)
     node_count: int = 0
     nodes_without_provenance: int = 0
+    empty_documents: list[str] = field(default_factory=list)
     pages: int = 0
     seconds: float = 0.0
+
+    @property
+    def attempted(self) -> int:
+        return len(self.documents) + len(self.failures)
+
+    @property
+    def ok(self) -> bool:
+        """True only if every document attempted actually landed in the index."""
+        return not self.failures and not self.empty_documents
 
     @property
     def provenance_coverage(self) -> float:
@@ -44,6 +71,14 @@ class IngestReport:
         if not self.node_count:
             return 0.0
         return (self.node_count - self.nodes_without_provenance) / self.node_count
+
+    def summary(self) -> str:
+        parts = [f"{len(self.documents)}/{self.attempted} documents indexed"]
+        if self.failures:
+            parts.append(f"{len(self.failures)} FAILED")
+        if self.empty_documents:
+            parts.append(f"{len(self.empty_documents)} produced no text")
+        return ", ".join(parts)
 
 
 def build_chunker(config: CorpusConfig) -> BaseChunker:
@@ -68,11 +103,18 @@ def build_chunker(config: CorpusConfig) -> BaseChunker:
         )
         return HierarchicalChunker()
     try:
-        return HybridChunker(
-            tokenizer=tokenizer_id,
-            max_tokens=config.max_chunk_tokens or config.embedding.max_tokens,
-            merge_peers=config.merge_peers,
+        # Built explicitly rather than passing the id as a string: string
+        # tokenizers are a deprecated HybridChunker initialisation path, and the
+        # explicit object is also where max_tokens actually belongs.
+        from docling_core.transforms.chunker.tokenizer.huggingface import (
+            HuggingFaceTokenizer,
         )
+
+        tokenizer = HuggingFaceTokenizer.from_pretrained(
+            model_name=tokenizer_id,
+            max_tokens=config.max_chunk_tokens or config.embedding.max_tokens,
+        )
+        return HybridChunker(tokenizer=tokenizer, merge_peers=config.merge_peers)
     except Exception as exc:
         log.warning(
             "could not load tokenizer %s for %s (%s); falling back to "
@@ -113,8 +155,37 @@ def ingest(
 
     all_nodes = []
     for path in paths:
-        converted = convert(path, options=conversion, cache_dir=settings.cache_dir)
-        nodes = build_nodes(converted, chunker=chunker, to_topleft=to_topleft)
+        # One bad document must not lose the batch. A run over a thousand
+        # scanned PDFs will meet a corrupt file, a password-protected one, and a
+        # provider import that is not installed — and the operator needs the
+        # other 997 indexed plus a list of what to look at, not a traceback and
+        # nothing. Failures are collected and re-reported at the end; the caller
+        # decides whether a partial run is acceptable.
+        try:
+            converted = convert(path, options=conversion, cache_dir=settings.cache_dir)
+            nodes = build_nodes(converted, chunker=chunker, to_topleft=to_topleft)
+        except Exception as exc:
+            log.error("FAILED %s: %s: %s", Path(str(path)).name, type(exc).__name__, exc)
+            report.failures.append(
+                FailedDocument(
+                    path=str(path), error=str(exc), error_type=type(exc).__name__
+                )
+            )
+            continue
+
+        if not nodes:
+            # Converted without error but yielded nothing — the signature of a
+            # scanned document ingested without OCR. Not an exception, and
+            # exactly the silent case worth naming: it would otherwise look like
+            # a successful ingest of a document that answers no question.
+            log.error(
+                "EMPTY %s: converted but produced no text. If it is scanned, "
+                "re-run with ocr enabled.",
+                Path(converted.source_path).name,
+            )
+            report.empty_documents.append(converted.source_path)
+            continue
+
         all_nodes.extend(nodes)
         report.documents.append(converted.doc_id)
         report.pages += converted.page_count
@@ -147,4 +218,6 @@ def ingest(
             report.nodes_without_provenance,
             report.node_count,
         )
+    if not report.ok:
+        log.error("ingest finished INCOMPLETE: %s", report.summary())
     return report

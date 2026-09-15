@@ -43,6 +43,46 @@ def build_embedding(model: EmbeddingModel, settings: Any) -> BaseEmbedding:
 
         return HuggingFaceEmbedding(model_name=model.name)
 
+    if model.provider is Provider.OPENAI_COMPATIBLE:
+        try:
+            from llama_index.embeddings.openai_like import OpenAILikeEmbedding
+        except ImportError as exc:
+            raise ImportError(
+                f"{model.name} needs the 'compatible' extra: uv sync --extra compatible"
+            ) from exc
+
+        base_url = model.base_url or settings.openai_compatible_base_url
+        if not base_url:
+            raise ValueError(
+                f"{model.name} is an openai-compatible model with no base_url. Set one "
+                f"on the catalogue entry or via ANEURAL_OPENAI_COMPATIBLE_BASE_URL."
+            )
+        # Such endpoints (exo, vLLM, a gateway) usually ignore the key but the
+        # client insists on one being present.
+        return OpenAILikeEmbedding(
+            model_name=model.name,
+            api_base=base_url,
+            api_key=settings.openai_api_key or "not-needed",
+            embed_batch_size=10,
+        )
+
+    if model.provider is Provider.BEDROCK:
+        try:
+            from llama_index.embeddings.bedrock import BedrockEmbedding
+        except ImportError as exc:
+            raise ImportError(
+                f"{model.name} needs the 'bedrock' extra: uv sync --extra bedrock"
+            ) from exc
+
+        # Credentials come from the ordinary AWS chain (env, profile, IMDS, IRSA)
+        # rather than being threaded through Settings - re-implementing that
+        # resolution order is how a deployment ends up unable to use a role.
+        return BedrockEmbedding(
+            model_name=model.name,
+            region_name=settings.aws_region,
+            profile_name=settings.aws_profile,
+        )
+
     if model.provider is Provider.OPENAI:
         try:
             from llama_index.embeddings.openai import OpenAIEmbedding
@@ -56,7 +96,13 @@ def build_embedding(model: EmbeddingModel, settings: Any) -> BaseEmbedding:
                 f"{model.name} is a hosted model and ANEURAL_OPENAI_API_KEY is unset. "
                 f"Note that using it sends document text off this machine."
             )
-        return OpenAIEmbedding(model=model.name, api_key=settings.openai_api_key)
+        # api_base honours a gateway (TrustGate, LiteLLM) sitting in front of
+        # OpenAI: same client, same key handling, traffic routed through policy.
+        return OpenAIEmbedding(
+            model=model.name,
+            api_key=settings.openai_api_key,
+            api_base=model.base_url or settings.openai_base_url,
+        )
 
     raise ValueError(f"Unhandled embedding provider: {model.provider}")
 
@@ -81,6 +127,48 @@ def build_llm(model: GenerationModel, settings: Any, **kwargs: Any) -> LLM:
             **kwargs,
         )
 
+    if model.provider is Provider.OPENAI_COMPATIBLE:
+        try:
+            from llama_index.llms.openai_like import OpenAILike
+        except ImportError as exc:
+            raise ImportError(
+                f"{model.name} needs the 'compatible' extra: uv sync --extra compatible"
+            ) from exc
+
+        base_url = model.base_url or settings.openai_compatible_base_url
+        if not base_url:
+            raise ValueError(
+                f"{model.name} is an openai-compatible model with no base_url. For an "
+                f"exo cluster this is usually its head node, e.g. "
+                f"http://localhost:8000/v1 - set ANEURAL_OPENAI_COMPATIBLE_BASE_URL."
+            )
+        return OpenAILike(
+            model=model.name,
+            api_base=base_url,
+            api_key=settings.openai_api_key or "not-needed",
+            context_window=model.context_window,
+            is_chat_model=True,
+            **kwargs,
+        )
+
+    if model.provider is Provider.BEDROCK:
+        try:
+            from llama_index.llms.bedrock_converse import BedrockConverse
+        except ImportError as exc:
+            raise ImportError(
+                f"{model.name} needs the 'bedrock' extra: uv sync --extra bedrock"
+            ) from exc
+
+        # Converse, not the legacy Bedrock API: it is the one with a uniform
+        # tool-use and structured-output surface across model families, which is
+        # what report generation needs.
+        return BedrockConverse(
+            model=model.name,
+            region_name=settings.aws_region,
+            profile_name=settings.aws_profile,
+            **kwargs,
+        )
+
     if model.provider is Provider.OPENAI:
         try:
             from llama_index.llms.openai import OpenAI
@@ -91,6 +179,11 @@ def build_llm(model: GenerationModel, settings: Any, **kwargs: Any) -> LLM:
 
         if not settings.openai_api_key:
             raise ValueError(f"{model.name} is hosted and ANEURAL_OPENAI_API_KEY is unset.")
-        return OpenAI(model=model.name, api_key=settings.openai_api_key, **kwargs)
+        return OpenAI(
+            model=model.name,
+            api_key=settings.openai_api_key,
+            api_base=model.base_url or settings.openai_base_url,
+            **kwargs,
+        )
 
     raise ValueError(f"Unhandled generation provider: {model.provider}")

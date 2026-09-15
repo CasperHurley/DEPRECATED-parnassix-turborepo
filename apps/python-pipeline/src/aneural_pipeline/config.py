@@ -35,6 +35,20 @@ class Settings(BaseSettings):
     ollama_base_url: str = "http://localhost:11434"
     openai_api_key: str | None = None
 
+    # Point this at an AI gateway (TrustGate, LiteLLM, a corporate proxy) to
+    # route hosted traffic through policy without changing any call site: the
+    # gateway speaks the OpenAI wire format, so only the base URL moves.
+    openai_base_url: str | None = None
+
+    # Default endpoint for OPENAI_COMPATIBLE models with no base_url of their
+    # own - an exo cluster head node, vLLM, LM Studio.
+    openai_compatible_base_url: str | None = None
+
+    # AWS Bedrock. Credentials themselves come from the standard AWS chain
+    # (env, profile, instance role), not from here.
+    aws_region: str = "us-east-1"
+    aws_profile: str | None = None
+
     # Where converted DoclingDocuments are cached. Conversion is the slow step
     # (layout models over every page); re-embedding the same corpus with a
     # different model should not pay it twice. This is what makes comparing

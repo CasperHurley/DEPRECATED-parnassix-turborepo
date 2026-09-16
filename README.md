@@ -12,7 +12,7 @@ This is the monorepo for the whole system: a shared Tamagui component layer rend
 | ---------------------------- | ---------------------------------------------- | ------------------------------------------------------------------------ |
 | Wire contract                | `packages/report-schema`                       | Built. Zod is the source of truth; JSON Schema is emitted for Python.    |
 | Renderer                     | `packages/ui`                                  | Built. `ReportCanvas` validates each component and renders by `kind`.    |
-| Corpus ingestion + retrieval | `apps/python-pipeline`                         | Built. Docling → chunks → Redis vector index, with citation resolution.  |
+| Corpus ingestion + retrieval | [`parnassix` (pythoness)](../../Pythoness/pythoness) | Built, and now a separate library. `apps/python-pipeline` consumes it.   |
 | Agent workflows              | `apps/python-pipeline`                         | Not built. Will populate component templates and retry on invalid enums. |
 | API gateway                  | `apps/api-client`                              | Scaffolded. Does not yet consume the contract or route to the pipeline.  |
 | Frontends                    | `apps/web-vite`, `apps/desktop`, `apps/native` | Built. All three render the same `@repo/ui` canvas.                      |
@@ -29,7 +29,7 @@ This is the monorepo for the whole system: a shared Tamagui component layer rend
 | `apps/native`          | Expo SDK 57 + React Native 0.86    | iOS, Android, and native-web via Metro       |
 | `apps/desktop`         | Electron 44 + electron-vite 5      | macOS/Windows/Linux desktop app              |
 | `apps/api-client`      | NestJS 12 on Fastify               | HTTP API                                     |
-| `apps/python-pipeline` | Python 3.13 + Docling + LlamaIndex | Documents → embeddings + per-fact provenance |
+| `apps/python-pipeline` | Python 3.12+ over the `parnassix` library | The report-schema contract, and the wire that maps provenance onto it |
 
 ### Packages
 
@@ -41,8 +41,9 @@ This is the monorepo for the whole system: a shared Tamagui component layer rend
 
 The Python app is a full turbo citizen: a thin `package.json` maps `build`/`dev`/`lint`/`test`
 onto `uv`, and its build depends on `@repo/report-schema` so the Zod → JSON Schema → Pydantic
-codegen reruns whenever the contract changes. It needs `uv`, Docker (for Redis Stack) and
-Ollama; see `apps/python-pipeline/README.md`.
+codegen reruns whenever the contract changes. It needs `uv` and a checkout of the
+`pythoness` repository beside this one; Docker and Ollama are optional now that the library's
+default vector store is embedded. See `apps/python-pipeline/README.md`.
 
 All three UI apps import from `@repo/ui`, so a component or theme token changes in one place and lands everywhere.
 
@@ -71,7 +72,7 @@ All three UI apps import from `@repo/ui`, so a component or theme token changes 
 
 **Contract** — [Zod](https://zod.dev) 4 in `@repo/report-schema`, emitted to JSON Schema and regenerated as Pydantic models by `datamodel-code-generator`
 
-**Pipeline** — Python 3.13, [Docling](https://github.com/docling-project/docling) for conversion and OCR, [LlamaIndex](https://www.llamaindex.ai) with Redis Stack as the vector store, [Ollama](https://ollama.com) for local embeddings, FastAPI for the HTTP surface
+**Pipeline** — Python 3.12+, the [`parnassix`](../../Pythoness/pythoness) library (Docling conversion, LanceDB by default with Redis optional, local embeddings, a tool registry served over HTTP and MCP). This app adds the report-schema contract and about 500 lines of wiring.
 
 **Tooling**
 
@@ -94,7 +95,7 @@ Run one app on its own:
 pnpm --filter web-vite dev
 pnpm --filter desktop dev
 pnpm --filter api-client dev
-pnpm --filter python-pipeline dev   # needs Redis: pnpm --filter python-pipeline redis:up
+pnpm --filter python-pipeline dev   # embedded store by default; redis:up only if configured for it
 pnpm --filter native dev      # expo start --web
 ```
 
@@ -130,7 +131,7 @@ Web and desktop both pin their port with `strictPort`, so neither silently slide
 | `desktop` renderer | 5174                                 |
 | `native` (Metro)   | 8081                                 |
 | `api-client`       | 3000                                 |
-| `python-pipeline`  | 8000 (Redis 6379, RedisInsight 8001) |
+| `python-pipeline`  | 8000 (Redis 6379 / RedisInsight 8001, only with `storage = "redis"`) |
 
 ## Workspace constraints
 

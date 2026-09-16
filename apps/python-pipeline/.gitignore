@@ -1,10 +1,14 @@
 .venv/
 .parnassix-cache/
+# The library's conversion cache and its downloaded ONNX embedding model.
+# Named for the library, not this app, because the library owns it.
+.pythoness-cache/
 .pytest_cache/
 .ruff_cache/
 __pycache__/
 *.pyc
 .env
 # Generated from packages/report-schema/schema/report-schema.json at build time.
-# Committing it would create a second copy of the contract that can drift.
+# Committing either would create a second copy of the contract that can drift.
 src/parnassix_pipeline/report/_generated.py
+src/parnassix_pipeline/report/schema.json

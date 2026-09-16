@@ -20,18 +20,32 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass
-from pathlib import Path
+from importlib import resources
 from typing import Any
 
 from ._generated import SourceRef
 
-_SCHEMA_PATH = (
-    Path(__file__).resolve().parents[4].parents[0]
-    / "packages"
-    / "report-schema"
-    / "schema"
-    / "report-schema.json"
-)
+SCHEMA_RESOURCE = "schema.json"
+"""The contract, as package data.
+
+This used to be a path walked six directory levels up to
+`packages/report-schema/schema/report-schema.json`. That worked from a checkout
+and nowhere else: installed as a wheel, the walk lands outside the package and
+`SCHEMA_VERSION` silently becomes `"unknown"` -- silently, because the read is
+wrapped in a try. A version that reports "unknown" rather than failing is the
+worst of both, since the index metadata then records a corpus as built against
+a contract nobody can name.
+
+`scripts/generate_models.py` copies the artifact here as part of the same build
+step that generates `_generated.py`, so the two always come from one read of one
+file, and `importlib.resources` finds it wherever the package ended up.
+"""
+
+
+def _read_schema() -> dict[str, Any]:
+    return json.loads(
+        resources.files(__package__).joinpath(SCHEMA_RESOURCE).read_text()
+    )
 
 
 def _read_schema_version() -> str:
@@ -41,9 +55,11 @@ def _read_schema_version() -> str:
     TypeScript side cannot leave a stale constant here claiming otherwise.
     """
     try:
-        schema = json.loads(_SCHEMA_PATH.read_text())
-        return str(schema.get("$id", "")).rsplit("/", 1)[-1] or "unknown"
+        return str(_read_schema().get("$id", "")).rsplit("/", 1)[-1] or "unknown"
     except (OSError, ValueError):
+        # Still soft, because importing this package must not require a build
+        # to have run. `test_contract.py` asserts the value is real, so a build
+        # that did not copy the schema fails a test rather than shipping.
         return "unknown"
 
 

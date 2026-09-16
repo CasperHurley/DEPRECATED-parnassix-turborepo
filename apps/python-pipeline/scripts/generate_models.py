@@ -17,7 +17,12 @@ from pathlib import Path
 
 APP = Path(__file__).resolve().parents[1]
 SCHEMA = APP.parents[1] / "packages" / "report-schema" / "schema" / "report-schema.json"
-OUT = APP / "src" / "parnassix_pipeline" / "report" / "_generated.py"
+PACKAGE = APP / "src" / "parnassix_pipeline" / "report"
+OUT = PACKAGE / "_generated.py"
+# The same artifact, copied in as package data. `validate.py` reads it through
+# `importlib.resources` for the contract version and could not before: it walked
+# six directory levels up, which resolves from a checkout and from nowhere else.
+SCHEMA_COPY = PACKAGE / "schema.json"
 
 BANNER = '''"""GENERATED FILE - DO NOT EDIT.
 
@@ -68,7 +73,10 @@ def main() -> int:
         return result.returncode
 
     OUT.write_text(BANNER + "\n" + OUT.read_text())
-    print(f"generated {OUT.relative_to(APP)}")
+    # One read, two outputs, so the models and the version they report cannot
+    # come from different revisions of the schema.
+    SCHEMA_COPY.write_text(SCHEMA.read_text())
+    print(f"generated {OUT.relative_to(APP)} and {SCHEMA_COPY.relative_to(APP)}")
     return 0
 
 

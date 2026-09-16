@@ -1,0 +1,34 @@
+# The corpus this service serves.
+#
+# Everything below is read by `pythoness`. Nothing in this file is specific to
+# reports except `wire`, which is the whole of the integration: the library
+# establishes where a fact came from, and `parnassix_pipeline.wire` decides what
+# those fields are called and checks the result against @repo/report-schema.
+
+version = 1
+
+[settings]
+# Imported before this config is used, so `wire = "report-schema"` resolves.
+# Without it `pn sync` here fails with "no wire format named 'report-schema'" --
+# whether a registered name exists depends on what has been imported, and a
+# config file has no other way to say so.
+imports = ["parnassix_pipeline.wire"]
+
+# Embedded and file-backed, so this app needs no container to run. Redis is
+# still available (`storage = "redis"`); it is no longer required.
+storage = "lancedb"
+
+[[corpus]]
+name = "default"
+wire = "report-schema"
+
+  [[corpus.source]]
+  id = "docs"
+  kind = "directory"
+  path = "./samples"
+  include = ["**/*.pdf"]
+  # The scanned fixture exists to be ingested WITH ocr, and without it converts
+  # to nothing. `pythoness` reports that rather than skipping it quietly, which
+  # is correct and also means a default `pn sync` here would always report an
+  # incomplete run. Add it back with `ocr = "native"` to exercise that path.
+  exclude = ["*-scanned.pdf"]

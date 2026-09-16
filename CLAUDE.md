@@ -17,7 +17,8 @@ able to do that.
 
 | Piece | Where | Role |
 | --- | --- | --- |
-| Corpus ingestion + retrieval | `apps/python-pipeline` | Docling → chunks → embeddings in Redis, with per-fact provenance (page + bbox + page size). Resolves node ids back to citations. **[built]** |
+| Corpus ingestion + retrieval | **[`parnassix` (pythoness)](../../Pythoness/pythoness)** — a separate library | Documents, SQL and tabular sources → embeddings with per-fact provenance. Resolves ids back to citations. **[built, and extracted out of this repo]** |
+| The report-schema contract | `apps/python-pipeline` | The Zod contract as Pydantic, the cross-field validators, and `ReportSchemaWire` — the ~20 lines that map the library's locators onto this project's `SourceRef`. **[built]** |
 | Agent workflows | `apps/python-pipeline` (not built) | Populate component templates. Invalid enum values are caught and handed back to an agent for a limited number of retries. |
 | API gateway | `apps/api-client` (NestJS/Fastify) | Routes between frontends and Python. Validates at the public boundary. |
 | Frontends | `apps/web-vite`, `apps/desktop`, `apps/native` | Render reports from the shared `@repo/ui` component layer. |
@@ -29,11 +30,40 @@ across embedding models. The index NAME also carries the model identity, so two 
 collide on one index in the first place, and a corpus can be indexed under several models at
 once to compare them.
 
-The Python side lives in this repo rather than a separate one, so the JSON Schema → Pydantic
-codegen is a turbo build edge rather than a thing someone remembers to run. Model choice
-defaults from detected hardware (a memory tier picks a model per ROLE — corpus embedding,
-cache embedding, generation), and **no tier ever defaults to a hosted model**: detection must
-never be the reason a run starts costing money or sends privileged documents off the machine.
+The JSON Schema → Pydantic codegen stays in this repo as a turbo build edge rather than a
+thing someone remembers to run. Model choice defaults from detected hardware (a memory tier
+picks a model per ROLE — corpus embedding, cache embedding, generation), and **no tier ever
+defaults to a hosted model**: detection must never be the reason a run starts costing money or
+sends privileged documents off the machine. That rule, and everything else generic, now lives
+in the library and is tested there.
+
+### This repo is the worked example — [built]
+
+`apps/python-pipeline` was the pipeline. It is now a consumer of one, and the split was made
+on a simple test: **anything that does not know what a report is belongs in the library.**
+About 2,700 lines moved out; about 500 stayed. What stayed is the contract and the wire that
+maps onto it.
+
+The seam is `WireFormat`. `pythoness` establishes WHERE a fact came from and knows nothing
+about what a consumer calls those fields; `ReportSchemaWire` supplies the camelCase spelling
+`packages/report-schema` defines and **validates the result against the generated
+`SourceRef`** before returning it. That last part is a guarantee the old code did not have:
+`ingest/provenance.py` built those keys inline, mirroring a Zod schema in a TypeScript package
+with nothing connecting them — a shape coupling with no import, so no tool could see it drift.
+
+Two consequences worth knowing:
+
+- **The wire refuses anything that is not a page.** The library now has SQL and tabular
+  sources whose locators are tables, rows and recorded queries. `SourceRef` has no spelling
+  for those, so `ReportSchemaWire` raises rather than inventing one — a made-up camelCase
+  shape would emit something the renderer's validator rejects, and it would reject it after a
+  corpus had been built. A Parnassix corpus is documents. If it ever needs a database, the Zod
+  contract grows a variant first and the wire follows it.
+- **The library is an editable path dependency**, because `parnassix` is not published yet.
+  So this app does not build without the pythoness checkout beside this repo, and **turbo will
+  not invalidate on a library change** — it sits outside the workspace. `pretest` runs
+  `uv sync` as a mitigation. Both go away at publication, when the path dep becomes a pinned
+  version that `uv.lock` carries and turbo's existing `inputs` already watch.
 
 ## Repo layout
 
@@ -660,15 +690,14 @@ Python side expands any such rule into `spans` before it crosses the wire.
 
 The wire contract exists and is enforced; the rendering is still scaffolding.
 
-- `apps/python-pipeline` — Docling → chunks → Redis vector index, with per-fact provenance.
-  `hardware.py` + `models/registry.py` (tier detection → a model per role), `config.py`
-  (per-corpus model binding; index name carries model identity), `ingest/` (`converter.py`
-  content-hashed conversion cache, `provenance.py` the bbox/origin/page-size mapping,
-  `nodes.py` stable ids and the LLM-visibility boundary, `pipeline.py`), `index/`
-  (vector store with metadata guard, semantic cache), `retrieval/` (query + server-side
-  citation resolution), `api/` (FastAPI), `report/` (generated Pydantic + the validators
-  JSON Schema cannot carry). Python pinned to 3.13 by
-  `llama-index-vector-stores-redis`, which also holds `redisvl` at the 0.4 line.
+- `apps/python-pipeline` — the worked example, ~500 lines. `wire.py` (`ReportSchemaWire`,
+  registered under the name `"report-schema"` so `pythoness.toml` can name it), `report/`
+  (Pydantic generated from the committed JSON Schema, plus the validators JSON Schema cannot
+  carry), `api/app.py` (the library's ten tool routes mounted via `build_routes`, plus
+  `/contract`, `/contract/source-ref`, `/contract/time-span`), `cli.py` (`contract`, `check`,
+  `serve` — everything else is `pn`). `pythoness.toml` binds the corpus to the wire.
+  Requires `uv` and a `pythoness` checkout; no Docker, no Ollama, no Python upper bound —
+  the library dropped the LlamaIndex Redis integration that had pinned both.
 - `packages/report-schema` (`@repo/report-schema`) — the wire contract, Zod as source of
   truth, zero deps but zod. Reused schemas carry `.meta({ id })` so the emitted JSON Schema
   has named `$defs` — without them Python codegen produces `FieldSchema0` instead of
@@ -715,12 +744,15 @@ Known gaps:
 - The Zod `superRefine` rules are reimplemented in Python (`report/validate.py`) because
   JSON Schema cannot carry them. Two implementations of one rule set can drift; tests pin
   both to the same examples, but a new cross-field rule has to be added in both places.
+- `parnassix` is unpublished, so the library is consumed by path. See "This repo is the worked
+  example" above for what that costs.
 
 ## Immediate next work
 
-0. Draw the highlights. The pipeline now emits top-left boxes with page sizes, so the
+0. Draw the highlights. The pipeline emits top-left boxes with page sizes, so the
    Timeline's `DetailPanel` has everything it needs to stop reporting "N regions" and
-   actually render them over a page image.
+   actually render them over a page image. The library can serve the page images
+   (`pythoness` was designed for that: `pageSize` is already on every ref).
 1. A second component (Table) — the first real test of whether adding a `kind` is mechanical.
 2. The chat/SSE session layer and the canvas mutation protocol
    (append / replace-by-id / remove), which the current snapshot-shaped `ReportSpec`

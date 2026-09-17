@@ -25,7 +25,7 @@ dependencies = [
 # price of co-developing a library and its first consumer in two repositories,
 # and it goes away the moment `parnassix` is on PyPI -- at which point this
 # becomes a pinned version and `uv.lock` carries it like any other dependency.
-parnassix = { path = "../../../../Pythoness/pythoness", editable = true }
+parnassix = { path = "../../../Pythoness/pythoness", editable = true }
 
 [project.scripts]
 parnassix-pipeline = "parnassix_pipeline.cli:app"

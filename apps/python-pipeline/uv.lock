@@ -2630,7 +2630,7 @@ wheels = [
 [[package]]
 name = "parnassix"
 version = "0.1.0"
-source = { editable = "../../../../Pythoness/pythoness" }
+source = { editable = "../../../Pythoness/pythoness" }
 dependencies = [
     { name = "docling" },
     { name = "docling-core" },
@@ -2690,6 +2690,11 @@ dev = [
     { name = "reportlab", specifier = ">=4.2" },
     { name = "ruff", specifier = ">=0.8" },
 ]
+notebook = [
+    { name = "ipykernel", specifier = ">=6.29" },
+    { name = "jupyterlab", specifier = ">=4.3" },
+    { name = "matplotlib", specifier = ">=3.9" },
+]
 
 [[package]]
 name = "parnassix-pipeline"
@@ -2716,7 +2721,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "fastapi", specifier = ">=0.141.1" },
-    { name = "parnassix", editable = "../../../../Pythoness/pythoness" },
+    { name = "parnassix", editable = "../../../Pythoness/pythoness" },
     { name = "pydantic", specifier = ">=2.9" },
     { name = "rich", specifier = ">=13.9" },
     { name = "typer", specifier = ">=0.15" },

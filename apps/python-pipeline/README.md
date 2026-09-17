@@ -13,7 +13,7 @@ What is left is what a consumer actually has to write, which is the point:
 | `wire.py` | ~20 of code | `ReportSchemaWire` — this project's `SourceRef` spelling, validated against its own contract |
 | `report/` | ~200 + generated | The contract: Pydantic models generated from the Zod schema, plus the cross-field rules JSON Schema cannot carry |
 | `api/app.py` | ~110 | The library's tool routes, mounted, plus three contract endpoints |
-| `cli.py` | ~100 | The report-specific commands. Everything else is `pn` |
+| `cli.py` | ~100 | The report-specific commands. Everything else is `parnassix` |
 
 Everything below the `Fragment` boundary — Docling, the conversion cache, the coordinate
 flip, stable node ids, the index guard, the semantic cache — is tested in `pythoness`, not
@@ -79,9 +79,9 @@ nothing to leak.
 
 ```sh
 pnpm --filter python-pipeline build     # uv sync + generate Pydantic models and schema.json
-pn sync                                 # convert, embed, index ./samples
-pn query "what is the liability cap?"   # passages with report-schema refs
-pn cite <nodeId>                        # resolve one citation
+parnassix sync                                 # convert, embed, index ./samples
+parnassix query "what is the liability cap?"   # passages with report-schema refs
+parnassix cite <nodeId>                        # resolve one citation
 ```
 
 No Docker and no Ollama are required: the library's default vector store is embedded and its
@@ -110,7 +110,7 @@ The three local ones exist because the agent workflow layer needs the same check
 path applies, and a second implementation of them in NestJS is how the two would come to
 disagree.
 
-The same tools are also reachable over MCP — `pn mcp`, or `pn init --claude` to register this
+The same tools are also reachable over MCP — `parnassix mcp`, or `parnassix init --claude` to register this
 corpus with Claude.
 
 ## The two-repository cost, stated plainly

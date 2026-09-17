@@ -14,7 +14,7 @@ What remains is what a consumer actually has to write:
                 cross-field rules JSON Schema cannot carry
     api/        the library's tool routes, mounted, plus three report-specific
                 endpoints
-    cli.py      the report-specific commands; everything else is `pn`
+    cli.py      the report-specific commands; everything else is `parnassix`
 
 That ratio is the point of the example.
 """

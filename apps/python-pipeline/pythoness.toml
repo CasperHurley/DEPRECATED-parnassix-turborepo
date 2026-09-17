@@ -9,7 +9,7 @@ version = 1
 
 [settings]
 # Imported before this config is used, so `wire = "report-schema"` resolves.
-# Without it `pn sync` here fails with "no wire format named 'report-schema'" --
+# Without it `parnassix sync` here fails with "no wire format named 'report-schema'" --
 # whether a registered name exists depends on what has been imported, and a
 # config file has no other way to say so.
 imports = ["parnassix_pipeline.wire"]
@@ -29,6 +29,6 @@ wire = "report-schema"
   include = ["**/*.pdf"]
   # The scanned fixture exists to be ingested WITH ocr, and without it converts
   # to nothing. `pythoness` reports that rather than skipping it quietly, which
-  # is correct and also means a default `pn sync` here would always report an
+  # is correct and also means a default `parnassix sync` here would always report an
   # incomplete run. Add it back with `ocr = "native"` to exercise that path.
   exclude = ["*-scanned.pdf"]

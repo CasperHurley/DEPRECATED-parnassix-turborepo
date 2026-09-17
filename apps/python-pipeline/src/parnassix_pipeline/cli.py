@@ -1,8 +1,9 @@
 """Command line for the report-specific half.
 
-Everything generic moved to `pn`, which this app now depends on: `pn sync`,
-`pn query`, `pn machine`, `pn models`, `pn compare` all work here unchanged and
-against the same `pythoness.toml`. What is left is the contract.
+Everything generic moved to `parnassix`, which this app now depends on:
+`parnassix sync`, `parnassix query`, `parnassix machine`, `parnassix models` and
+`parnassix compare` all work here unchanged and against the same
+`pythoness.toml`. What is left is the contract.
 
 Keeping a second copy of `ingest` and `query` wrapped around the library would
 have made this app look like it still owned them, which is exactly the thing
@@ -38,7 +39,8 @@ def contract() -> None:
         "packages/report-schema/schema/report-schema.json.[/dim]"
     )
     console.print(
-        "[dim]Corpus commands live in `pn` — pn sync, pn query, pn cite, pn mcp.[/dim]"
+        "[dim]Corpus commands live in `parnassix` — "
+        "parnassix sync, parnassix query, parnassix cite, parnassix mcp.[/dim]"
     )
 
 

@@ -695,7 +695,7 @@ The wire contract exists and is enforced; the rendering is still scaffolding.
   (Pydantic generated from the committed JSON Schema, plus the validators JSON Schema cannot
   carry), `api/app.py` (the library's ten tool routes mounted via `build_routes`, plus
   `/contract`, `/contract/source-ref`, `/contract/time-span`), `cli.py` (`contract`, `check`,
-  `serve` — everything else is `pn`). `pythoness.toml` binds the corpus to the wire.
+  `serve` — everything else is `parnassix`). `pythoness.toml` binds the corpus to the wire.
   Requires `uv` and a `pythoness` checkout; no Docker, no Ollama, no Python upper bound —
   the library dropped the LlamaIndex Redis integration that had pinned both.
 - `packages/report-schema` (`@repo/report-schema`) — the wire contract, Zod as source of

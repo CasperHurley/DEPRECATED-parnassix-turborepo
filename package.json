@@ -16,7 +16,7 @@
   "engines": {
     "node": ">=18"
   },
-  "name": "parnassix-turborepo",
+  "name": "DEPRECATED-parnassix-turborepo",
   "devEngines": {
     "packageManager": {
       "name": "pnpm",

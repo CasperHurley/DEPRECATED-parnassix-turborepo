@@ -1,4 +1,11 @@
-# Parnassix
+# Parnassix (deprecated)
+
+> **Deprecated.** This repository is superseded and no longer developed. The Parnassix app
+> now lives in `pythoness-gui` (to be renamed `parnassix-turborepo`): web, desktop and
+> native front ends on one Tamagui component layer, one NestJS/Fastify gateway, and a
+> Python app over the `parnassix` library (not yet published). The report
+> renderer below is an approach that was abandoned, not one waiting to be ported. Kept for
+> history, and because `apps/native` is where the new app's mobile shell starts.
 
 Parnassix generates reports assembled from reusable, deterministic components. Component templates are fixed in shape; backend agents influence the output only by choosing enum values and supplying data. A hallucinating agent can produce wrong data, but it cannot produce a shape this repo doesn't know how to render.
 
